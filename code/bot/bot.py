@@ -40,7 +40,7 @@ class GoonerMusic(commands.Bot):
         print("Bot initialized.")
 
 # Creating the bot
-bot = GoonerMusic(command_prefix='', intents=discord.Intents.all())
+bot = GoonerMusic(command_prefix='!', intents=discord.Intents.all())
 
 # Run on server(s)
 bot.run(os.getenv('DISCORD_TOKEN'))
