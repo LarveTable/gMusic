@@ -4,15 +4,26 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
-import time
 
 # Import discord token
 load_dotenv()
+
+# Check if the temp_songs directory exists, if not create it
+if not os.path.exists('code/bot/cogs/temp_songs/'):
+    os.makedirs('code/bot/cogs/temp_songs/')
 
 # Define cogs extensions
 ext = ['fun', 'music']
 
 print('Starting bot...')
+
+# Check if the Opus library is loaded
+if not discord.opus.is_loaded():
+    try:
+        # Load Opus for voice support
+        discord.opus.load_opus('/opt/homebrew/lib/libopus.dylib')
+    except Exception:
+        raise RuntimeError('Opus failed to load')
 
 class GoonerMusic(commands.Bot):
     async def on_ready(self):
