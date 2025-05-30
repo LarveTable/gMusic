@@ -64,7 +64,6 @@ class MusicCog(commands.Cog):
 
                 # If the song is found, we will play it
                 if (yt != None):
-                    print(yt)
                     embed = discord.Embed(
                                 title=f'Found {yt['title']} on Youtube '+os.getenv('FOUND')+' !',
                                 color=discord.Color.green()
