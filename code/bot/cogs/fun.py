@@ -13,17 +13,16 @@ class FunCog(commands.Cog):
     async def leo(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title='Léo',
-            description='est une pute',
+            description='est un caca',
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed)
     
-    # The command issuer gets a random 'Ta mère' joke with his name in it
-    @app_commands.command(name='tamere', description='A random \'Ta mère\' joke.')
-    async def tamere(self, interaction: discord.Interaction, user: discord.User = None):
-
+    # The command issuer gets a random 'secret' joke with his name in it
+    @app_commands.command(name='secret', description='A random \'secret\' joke.')
+    async def secret(self, interaction: discord.Interaction, user: discord.User = None):
         """
-        Responds with a random 'Ta mère' joke, optionally directed at a specified user.
+        Responds with a random 'secret' joke, optionally directed at a specified user.
         Parameters:
         - interaction: The interaction object from Discord.
         - user: The user to direct the joke at. If not specified, the joke is directed at the command issuer.
@@ -35,7 +34,7 @@ class FunCog(commands.Cog):
         if user is None:
             user = interaction.user
         
-        # Get a random joke from the tamere_jokes list
+        # Get a random joke from the jokes list
         joke = random.choice(jokes)
         
         # Format the joke with the user's name

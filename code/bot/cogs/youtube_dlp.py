@@ -19,6 +19,10 @@ class YTDownload(discord.PCMVolumeTransformer):
        
         # Function to create a result dictionary
         def make_result(info, out):
+            # Strip the file extension from the output path
+            out = out.rsplit('.', 1)[0]
+            # Add the file extension to the output path
+            out += '.m4a' # This fixes a weird issue with yt-dlp giving a .mp4 extension instead of .m4a
             return {
                 "path": out,
                 "title": info.get("title"),
