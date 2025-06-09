@@ -37,7 +37,7 @@ class GoonerMusic(commands.Bot):
         except Exception as e:
             print(e)
 
-        print("Bot initialized.")
+        print("Bot initialized.") 
 
 # Creating the bot
 bot = GoonerMusic(command_prefix='!', intents=discord.Intents.all())
