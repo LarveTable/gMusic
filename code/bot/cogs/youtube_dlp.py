@@ -8,7 +8,18 @@ ydl_opts = {
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'm4a',
     }],
-    'outtmpl': 'code/bot/cogs/temp_songs/%(title)s.%(ext)s'
+    'outtmpl': 'code/bot/cogs/temp_songs/%(title)s.%(ext)s',
+    'noplaylist': True,
+    'concurrent_fragment_downloads': 5,
+    # 🔥 Utiliser aria2c comme téléchargeur
+    'downloader': 'aria2c',
+    'downloader_args': {
+        'aria2c': [
+            '-x', '16',   # jusqu'à 16 connexions par serveur
+            '-s', '16',   # 16 téléchargements parallèles
+            '-k', '1M'    # taille des morceaux
+        ]
+    }
 }
 
 class YTDownload(discord.PCMVolumeTransformer):

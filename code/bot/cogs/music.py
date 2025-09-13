@@ -90,7 +90,7 @@ class MusicCog(commands.Cog):
                     # If the song is found, we will play it
                     if (yt != None):
                         embed = discord.Embed(
-                                    title=f'Found {yt['title']} on Youtube '+os.getenv('FOUND')+' !',
+                                    title=f'Found {yt["title"]} on Youtube '+os.getenv('FOUND')+' !',
                                     color=discord.Color.green()
                                 )
                         await self.message.edit(embed=embed)
@@ -106,7 +106,7 @@ class MusicCog(commands.Cog):
                         if voice_client.is_connected():
                             voice_client.play(discord.FFmpegPCMAudio(yt['path']), after=lambda e: self.bot.loop.create_task(self.finished_playing(interaction)))
                             embed = discord.Embed(
-                                title=f'Now playing {yt['title']}',
+                                title=f'Now playing {yt["title"]}',
                                 color=discord.Color.green()
                             )
                             embed.set_thumbnail(url=yt['thumbnail'])
@@ -126,7 +126,7 @@ class MusicCog(commands.Cog):
                                 )
                         await self.message.edit(embed=embed)
 
-                except Exception as e:
+                except Exception as e: # DOES NOT RESTART WHEN NO SONG IS FOUND, TODO
                     print(e)
                     embed = discord.Embed(
                                 title=f'Error while searching. Fucking code is broken.',
@@ -137,7 +137,7 @@ class MusicCog(commands.Cog):
                     await self.next.callback(self=self, interaction=interaction)
 
             else:
-                # SHOULD CHECK IF INTERACTION HAS BEEN RESPONDED TO AND IF SO INITIATE STOP ELSE DO THIS
+                # SHOULD CHECK IF INTERACTION HAS BEEN RESPONDED TO AND IF SO INITIATE STOP ELSE DO THIS, TODO
 
                 # The user is not in a voice channel
                 embed = discord.Embed(

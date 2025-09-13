@@ -21,7 +21,14 @@ print('Starting bot...')
 if not discord.opus.is_loaded():
     try:
         # Load Opus for voice support
-        discord.opus.load_opus('/opt/homebrew/lib/libopus.dylib')
+
+        # If you are on Windows, load the opus.dll in the cogs folder
+        if os.name == 'nt':
+            discord.opus.load_opus('code/bot/cogs/opus.dll')
+
+        # This is the path for MacOS, change it if you are on a different OS
+        if os.name == 'posix':
+            discord.opus.load_opus('/opt/homebrew/lib/libopus.dylib')
     except Exception:
         raise RuntimeError('Opus failed to load')
 
