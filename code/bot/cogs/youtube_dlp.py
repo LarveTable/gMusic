@@ -75,7 +75,7 @@ class YTDownload(discord.PCMVolumeTransformer):
             # Search for the query and get results
             info = ydl.extract_info(f'ytsearch:{query}', download=True)
             # If there are entries in the search results, call from_url with the first entry
-            if info['entries']:
+            if info != None and info['entries']:
                 return await cls.from_url(None, info_from_search=info['entries'][0], ydl=ydl)
             else:
                 return None

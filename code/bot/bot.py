@@ -50,4 +50,7 @@ class GoonerMusic(commands.Bot):
 bot = GoonerMusic(command_prefix='!', intents=discord.Intents.all())
 
 # Run on server(s)
-bot.run(os.getenv('DISCORD_TOKEN'))
+token = os.getenv('DISCORD_TOKEN')
+if token is None:
+    raise ValueError("No DISCORD_TOKEN found in environment variables.")
+bot.run(token)
