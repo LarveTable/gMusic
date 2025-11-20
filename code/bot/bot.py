@@ -26,7 +26,7 @@ if not discord.opus.is_loaded():
         if os.name == 'nt':
             discord.opus.load_opus('code/bot/cogs/opus.dll')
 
-        # This is the path for MacOS, change it if you are on a different OS
+        # This is the path for MacOS using homebrew
         if os.name == 'posix':
             discord.opus.load_opus('/opt/homebrew/lib/libopus.dylib')
     except Exception:

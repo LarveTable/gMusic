@@ -3,7 +3,6 @@ import discord
 
 ydl_opts = {
     'format': 'm4a/bestaudio/best',
-    # ℹ️ See help(yt_dlp.postprocessor) for a list of available Postprocessors and their arguments
     'postprocessors': [{  # Extract audio using ffmpeg
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'm4a',
@@ -11,13 +10,12 @@ ydl_opts = {
     'outtmpl': 'code/bot/cogs/temp_songs/%(title)s.%(ext)s',
     'noplaylist': True,
     'concurrent_fragment_downloads': 5,
-    # 🔥 Utiliser aria2c comme téléchargeur
     'downloader': 'aria2c',
     'downloader_args': {
         'aria2c': [
-            '-x', '16',   # jusqu'à 16 connexions par serveur
-            '-s', '16',   # 16 téléchargements parallèles
-            '-k', '1M'    # taille des morceaux
+            '-x', '16',
+            '-s', '16',
+            '-k', '1M' 
         ]
     }
 }

@@ -12,7 +12,7 @@ class MusicCog(commands.Cog):
         self.message = None
         self.channel = None
 
-    # Creating the group play, which is the master command to play a music, we will define sub-commands later
+    # Creating the group play, which is the master command to play a music
     play_group = app_commands.Group(name='play', description='Play a music from available music sources.')
     
     # Sub-command to play a music from a Youtube link or title
