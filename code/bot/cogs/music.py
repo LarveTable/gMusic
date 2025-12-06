@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 from cogs.youtube_dlp import YTDownload
 import os
+from cogs.youtube_dlp_remaster import YTDownload
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -18,6 +19,7 @@ class MusicCog(commands.Cog):
     # Sub-command to play a music from a Youtube link or title
     @play_group.command(name='youtube', description='Play a music from a Youtube link or title.')
     @app_commands.describe(query="Link or URL")
+    @app_commands.autocomplete(query=YTDownload.preview_results)
     async def youtube(self, interaction: discord.Interaction, query : str):
         """
         Play a music from a Youtube link or title.
