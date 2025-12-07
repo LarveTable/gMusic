@@ -4,9 +4,14 @@ from discord import app_commands
 import asyncio
 import os
 import json
+from collections import deque
+import glob
 
 # Store active search tasks per user to allow cancellation if needed
 active_search_tasks = {}
+
+# Queue of cached songs to delete de oldest fast
+cache = deque(maxlen=20) # Max 20 songs in cache
 
 # Dictionary to store loaded info dicts
 loaded_dicts = {}
@@ -25,7 +30,10 @@ def load_dicts_sync():
                     with open(f'code/bot/cogs/temp_dicts/{filename}', 'r') as f:
                         # Load json dict from file
                         info_dict = json.load(f)
+                        # Load the dict in dict cache
                         loaded[info_dict['id']] = info_dict
+                        # Add the id to the circular cache
+                        cache.append(info_dict['id'])
                 except Exception as e:
                     print(f'[YTDownload] --- Error loading dict from {filename}: {e}')
         loaded_dicts.update(loaded)
@@ -41,12 +49,12 @@ ytdl_opts = {
     'outtmpl': 'code/bot/cogs/temp_songs/%(id)s.%(ext)s', # Where to store downloaded files
     #'download_archive': 'code/bot/cogs/temp_songs/downloaded.txt', # Where to record downloaded files NOT USEFUL I THINK
     #'break_on_existing': True, TO TEST Skips the download if the file is present
+    'no_warnings': True, # Suppress warnings, especially the sabr one
     'noplaylist': True, # Don't download playlists
-    #'quiet': True, Don't output the logs in console
     'progress_hooks': [], # We will add hooks later, used to track download progress to inform the user
     #'sleep_interval': 2, # Sleep interval between downloads to avoid rate limiting TO TEST IF NEEDED
     #'sleep_interval_requests' : 1 # Sleep interval between extractions for security (especially if used with infinite AI playlist)
-    #'quiet': True, # Suppress output except for errors
+    'quiet': True, # Suppress output except for errors
 }
 
 # Youtube-DL options for fast extraction (no download)
@@ -54,13 +62,14 @@ ytdl_opts_fast_extractor = {
     'extract_flat': True, # Fast extraction, only metadata
     'skip_download': True, # Don't download the video/audio
     'noplaylist': True, # Don't download playlists
-    'extractor_args': { # # Skip unnecessary extractors to speed up the process
+    'no_warnings': True, # Suppress warnings, especially the sabr one
+    'extractor_args': { # Skip unnecessary extractors to speed up the process
         'youtube': {
             'player_skip': ['configs', 'webpage', 'js', 'initial_data']
         }
     },
     'sleep_interval_requests' : 0.3, # Sleep interval between extractions for security
-    #'quiet': True, # Suppress output except for errors
+    'quiet': True, # Suppress output except for errors
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_opts) # Load the basic downloader
@@ -86,7 +95,6 @@ async def check_present(query : str):
         # Check if the id is in loaded_dicts
         if result is not None and result['entries']:
             song = result['entries'][0]
-            print(f'[YTDownload] --- check_present found song: {song["title"]} with id {song["id"]}')
             if song['id'] in loaded_dicts:
                 print(f'[YTDownload] --- Song \'{song["title"]}\' found in memory.')
                 return loaded_dicts[song['id']]
@@ -95,8 +103,45 @@ async def check_present(query : str):
                 return song['url']
     return None
 
+# Removing songs and associated dicts
+def remove_files(id):
+    try:
+        # Remove the dict
+        os.remove(f'code/bot/cogs/temp_dicts/{id}.txt')
+        # Remove the song file
+        for file in glob.glob(f'code/bot/cogs/temp_songs/{id}.*'):
+            os.remove(file)
+        print(f'[YTDownload] --- Removed disk files for id: {id}')
+    except Exception as e:
+        print(f'[YTDownload] --- Error removing files for id \'{id}\': {e}')
+
+# Cache handling function, id can't be already present as checked before calling this function
+async def add_to_cache(id : str):
+    global loaded_dicts # Modify the global loaded_dicts
+    
+    # If cache is full
+    if len(cache) == cache.maxlen:
+        # Remove the oldest item
+        old_id = cache.popleft()
+        # Add the id to the cache
+        cache.append(id)
+        # Delete from memory
+        if old_id in loaded_dicts:
+            del loaded_dicts[old_id]
+        print(f'[YTDownload] --- Cache full. Removed id \'{old_id}\' from memory and cache.')
+
+        # Remove associated files (separate thread is not risky since the memory updates were made bafore this line)
+        asyncio.create_task(asyncio.to_thread(remove_files, old_id))
+    # If cache is not full
+    else:
+        # Add the new id to the cache
+        cache.append(id)
+    print(f'[YTDownload] --- Added id \'{id}\' to cache.')
+
+
 # Asynchronously save the info dict to a text file
 async def save_dict_async(info : dict):
+    global loaded_dicts # Modify the global loaded_dicts
     # Extract only JSON-serializable fields
     essential_fields = {
         'id': info.get('id'),
@@ -113,9 +158,11 @@ async def save_dict_async(info : dict):
     # Save the essential fields as JSON
     with open(f'code/bot/cogs/temp_dicts/{info["id"]}.txt', 'w') as f:
         json.dump(essential_fields, f)
+    # Add to circular cache
+    await add_to_cache(essential_fields['id'])
     # Update the loaded_dicts in memory
     loaded_dicts[essential_fields['id']] = essential_fields
-    print(f'[YTDownload] --- Added \'{info["title"]}\' to momory dicts.')
+    print(f'[YTDownload] --- Added \'{info["title"]}\' to memory dicts.')
     print(f'[YTDownload] --- Saved dict for \'{info["title"]}\' asynchronously.')
 
 class YTDownload(discord.PCMVolumeTransformer):
@@ -182,6 +229,10 @@ class YTDownload(discord.PCMVolumeTransformer):
         if present is not None:
             # If cached result is a dict, return it directly
             if isinstance(present, dict):
+                # Push to the head of the cache
+                cache.remove(present['id'])
+                cache.append(present['id'])
+                print(f'[YTDownload] --- Moved id \'{present["id"]}\' to the head of the cache since already present.')
                 print(f'[YTDownload] --- Using cached version of \'{present["title"]}\'.')
                 return present
             # If not cached, use the found URL to speed up the process
