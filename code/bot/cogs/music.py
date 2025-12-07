@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from cogs.youtube_dlp import YTDownload
 import os
 from cogs.youtube_dlp_remaster import YTDownload
 
@@ -84,10 +83,7 @@ class MusicCog(commands.Cog):
                 # Search for the song on YouTube
                 try:
                     # If the song is a link, we will use it directly, otherwise we will search for it
-                    if 'http' in song or 'www' in song:
-                        yt = await YTDownload.from_url(song)
-                    else:
-                        yt = await YTDownload.from_search(song)
+                    yt = await YTDownload.search(song)
 
                     # If the song is found, we will play it
                     if (yt != None):
@@ -106,7 +102,7 @@ class MusicCog(commands.Cog):
                         # The message should be displayed as the most recent message in the channel
                         voice_client = interaction.guild.voice_client
                         if voice_client.is_connected():
-                            voice_client.play(discord.FFmpegPCMAudio(yt['path']), after=lambda e: self.bot.loop.create_task(self.finished_playing(interaction)))
+                            voice_client.play(discord.FFmpegPCMAudio(f'code/bot/cogs/temp_songs/{yt["id"]}.{yt["ext"]}'), after=lambda e: self.bot.loop.create_task(self.finished_playing(interaction)))
                             embed = discord.Embed(
                                 title=f'Now playing {yt["title"]}',
                                 color=discord.Color.green()
@@ -117,7 +113,7 @@ class MusicCog(commands.Cog):
                             embed.add_field(name='Views', value=yt['view_count'], inline=True)
                             embed.add_field(name='Likes', value=yt['like_count'], inline=True)
                             embed.add_field(name='Upload date', value=yt['upload_date'], inline=True)
-                            embed.set_footer(text=f'URL: {yt["url"]}')
+                            embed.set_footer(text=f'URL: {yt["webpage_url"]}')
                             await self.message.edit(embed=embed)
 
                     else:
