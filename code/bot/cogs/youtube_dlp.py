@@ -15,13 +15,15 @@ cache = deque(maxlen=20) # Max 20 songs in cache
 
 # Dictionary to store loaded info dicts
 loaded_dicts = {}
-# Check if the temp_dicts directory exists, if not create it
-if not os.path.exists('code/bot/cogs/temp_dicts/'):
-    os.makedirs('code/bot/cogs/temp_dicts/')
 
 def load_dicts_sync():
     global loaded_dicts # Modify the global loaded_dicts
     loaded = {}
+    
+    # Check if the temp_dicts directory exists, if not create it
+    if not os.path.exists('code/bot/cogs/temp_dicts/'):
+        os.makedirs('code/bot/cogs/temp_dicts/')
+
     # Load all .txt files in temp_dicts
     try:
         for filename in os.listdir('code/bot/cogs/temp_dicts/'):
@@ -138,7 +140,6 @@ async def add_to_cache(id : str):
         cache.append(id)
     print(f'[YTDownload] --- Added id \'{id}\' to cache.')
 
-
 # Asynchronously save the info dict to a text file
 async def save_dict_async(info : dict):
     global loaded_dicts # Modify the global loaded_dicts
@@ -166,6 +167,12 @@ async def save_dict_async(info : dict):
     print(f'[YTDownload] --- Saved dict for \'{info["title"]}\' asynchronously.')
 
 class YTDownload(discord.PCMVolumeTransformer):
+    def __init__(self, source, data):
+        # Initialize the parent class with default volume 0.5
+        super().__init__(source, volume=0.5)
+        # Store the data dict
+        self.data = data
+
     @staticmethod
     # Blocking search function to be run in executor
     def _search_blocking(query):
@@ -184,7 +191,7 @@ class YTDownload(discord.PCMVolumeTransformer):
                 task.cancel()
         
         # If the query is an url or empty, return an empty choice list
-        if query == "" or query.startswith('http://') or query.startswith('https://'):
+        if query == "" or query.startswith('http://') or query.startswith('https://') or 'www.' in query:
             return []
 
         # Search runner with debounce

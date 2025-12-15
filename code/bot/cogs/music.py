@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
-from cogs.youtube_dlp_remaster import YTDownload
+from cogs.youtube_dlp import YTDownload
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
