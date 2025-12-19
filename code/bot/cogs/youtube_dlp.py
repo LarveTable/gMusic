@@ -166,12 +166,7 @@ async def save_dict_async(info : dict):
     print(f'[YTDownload] --- Added \'{info["title"]}\' to memory dicts.')
     print(f'[YTDownload] --- Saved dict for \'{info["title"]}\' asynchronously.')
 
-class YTDownload(discord.PCMVolumeTransformer):
-    def __init__(self, source, data):
-        # Initialize the parent class with default volume 0.5
-        super().__init__(source, volume=0.5)
-        # Store the data dict
-        self.data = data
+class YTDownload:
 
     @staticmethod
     # Blocking search function to be run in executor
@@ -211,6 +206,7 @@ class YTDownload(discord.PCMVolumeTransformer):
             # Wait for the search task to complete
             results = await task
 
+            # If not results, return empty list
             if results is None or not results['entries']:
                 return []
 
@@ -256,7 +252,7 @@ class YTDownload(discord.PCMVolumeTransformer):
                     return result
                 except Exception as e:
                     print(f'[YTDownload] --- Error when downloading or saving result for \'{query}\': {e}')
-                    return None
+                    raise e
         # Nothing was found
         print(f'[YTDownload] --- Nothing found for query: \'{query}\'')
         return None

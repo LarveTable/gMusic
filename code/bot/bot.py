@@ -13,7 +13,7 @@ if not os.path.exists('code/bot/cogs/temp_songs/'):
     os.makedirs('code/bot/cogs/temp_songs/')
 
 # Define cogs extensions
-ext = ['fun', 'music']
+ext = ['fun', 'music_remaster']
 
 print('Starting bot...')
 
