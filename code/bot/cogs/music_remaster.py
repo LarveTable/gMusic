@@ -17,6 +17,8 @@ class MusicCog(commands.Cog):
         self.waitlist = deque()
         # Message object for the current player info
         self.player = None
+        # Disconnect timer task
+        self.disconnect_timer = None
 
     # Creating the group play, which is the master command to play a music
     play_group = app_commands.Group(name='play', description='Play a music from available music sources.')
@@ -26,19 +28,28 @@ class MusicCog(commands.Cog):
     @app_commands.describe(query="Link or URL")
     @app_commands.autocomplete(query=YTDownload.preview_results)
     async def youtube(self, interaction: discord.Interaction, query : str):
+        # Delete any preview task this user launched
+        YTDownload.cancel_user_task(interaction.user.id)
+        # Defer the interaction to prevent timeouts
+        await interaction.response.defer(ephemeral=True, thinking=True)
         # Ensure the bot is in the user's voice channel, or connect it (can't use before_invoke with app_commands)
         try:
             await self.ensure_voice(interaction)
         except commands.CommandError:
             return
         # From now on, the bot is guaranteed to be in the user's voice channel thanks to 'ensure_voice'
+        # Cancel disconnect timer if set
+        if self.disconnect_timer:
+            self.disconnect_timer.cancel()
+            self.disconnect_timer = None
+            print("[BOT] --- Cancelled inactivity timer.")
         # Tell the user that the search is initiated
         searching_embed = discord.Embed(
                     title=f'🔍 Searching for **{query}** on YouTube...',
                     description=os.getenv('SEARCHING'),
                     color=discord.Color.orange()
                 )
-        await interaction.response.send_message(embed=searching_embed, ephemeral=True)
+        await interaction.edit_original_response(embed=searching_embed)
 
         # Search for the song on youtube
         try :
@@ -98,18 +109,38 @@ class MusicCog(commands.Cog):
                                 description='Check console for more details.',
                                 color=discord.Color.red()
                             )
-            await interaction.edit_original_response(embed=error_embed)
+            await interaction.followup.send(embed=error_embed, ephemeral=True)
 
     # Function to ensure the player message is always at the bottom of the chat
     async def ensure_player(self):
-        # Retrieve the original player message
-        msg = self.player.embeds[0]
-        # Retrieve the original player message channel
-        channel = self.player.channel
-        # Delete the old player message
-        await self.player.delete()
-        # Send it again
-        self.player = await channel.send(embed=msg)
+        try:
+            # Retrieve the original player message
+            msg = self.player.embeds[0]
+            # Retrieve the original player message channel
+            channel = self.player.channel
+            # Delete the old player message
+            await self.player.delete()
+            # Send it again
+            self.player = await channel.send(embed=msg)
+        except discord.NotFound:
+            pass
+    
+    async def disconnect_after_delay(self, interaction: discord.Interaction):
+        print("[BOT] --- Started inactivity timer.")
+        # Wait 1 minute after the last song ends
+        await asyncio.sleep(60)
+
+        # Get the bot's voice client
+        voice_client = interaction.guild.voice_client
+
+        # If the voice client is still
+        if voice_client and voice_client.is_connected():
+            # Disconnect it
+            await voice_client.disconnect()
+            # Reset bot's variables
+            self.player = None
+            self.disconnect_timer = None
+            print("[BOT] --- Disconnected for inactivity.")
 
     # Function to play a song in the bot's voice channel, executed everytime a song ends if the waiting list has something in it
     async def play_next(self, interaction: discord.Interaction):
@@ -117,7 +148,11 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         # Delete previous player if it exists
         if self.player:
-            await self.player.delete()
+            try:
+                await self.player.delete()
+            except discord.NotFound:
+                # Message was already deleted (by user or by ensure_player)
+                pass
         # If something is in the waiting list
         if len(self.waitlist) > 0:
             # Retrieve the data from the next song in queue
@@ -150,6 +185,8 @@ class MusicCog(commands.Cog):
                 color=discord.Color.green()
             )
             self.player = await interaction.channel.send(embed=finished_embed)
+            # Start the disconnect timer
+            self.disconnect_timer = asyncio.create_task(self.disconnect_after_delay(interaction))
         
     # Ensure the bot is/will connected/connect to the user voice channel
     async def ensure_voice(self, interaction: discord.Interaction):
@@ -192,7 +229,14 @@ class MusicCog(commands.Cog):
                 error_exception = commands.CommandError('Author is not in a voice channel.')
         # If there was an error, send the message after releasing the lock
         if error_embed:
-            await interaction.response.send_message(embed=error_embed, ephemeral=True, delete_after=10)
+            # If interaction is defered, use followup
+            if interaction.response.is_done():
+                sent_msg = await interaction.followup.send(embed=error_embed, ephemeral=True, wait=True)
+                # Delete the followup message after 10 seconds
+                await sent_msg.delete(delay=10.0)
+            # If the interaction is not defered
+            else:
+                await interaction.response.send_message(embed=error_embed, ephemeral=True, delete_after=10)
             raise error_exception
         
 # This function is used to setup the cog

@@ -172,6 +172,17 @@ class YTDownload:
     # Blocking search function to be run in executor
     def _search_blocking(query):
         return ytdl_fast.extract_info(f'ytsearch5:{query}', download=False)
+    
+    @classmethod
+    # Cancel the preview_results task for a specific user who ran the "/play youtube" command without waiting for previews
+    def cancel_user_task(cls, user_id: int):
+        if user_id in active_search_tasks:
+            task = active_search_tasks[user_id]
+            if not task.done():
+                task.cancel()
+                print(f"[YTDownload] --- Manually cancelled preview task for user **{user_id}** (Launched command).")
+            # Now that the user is done typing, delete its entry in the active tasks dictionnary
+            del active_search_tasks[user_id]
 
     # Preview the search results in discord
     @classmethod
@@ -222,6 +233,11 @@ class YTDownload:
             print(f'[YTDownload] --- Error creating preview choices: {e}')
             print('[YTDownload] --- Skipping previews for this search.')
             return []
+        # Finally, delete the active task entry in the dictionnary (memory management)
+        finally:
+            # Check if another task did not replace this one before deleting
+            if active_search_tasks.get(user_id) == task:
+                del active_search_tasks[user_id]
         
     # Search from user, either an URL or a query
     @classmethod
