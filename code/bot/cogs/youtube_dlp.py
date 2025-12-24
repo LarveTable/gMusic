@@ -203,7 +203,7 @@ class YTDownload:
         # Search runner with debounce
         async def search_runner():
             # Debounce delay
-            await asyncio.sleep(0.5) 
+            await asyncio.sleep(0.3) 
             # If no input change, perform search
             return await asyncio.to_thread(cls._search_blocking, query)
         
