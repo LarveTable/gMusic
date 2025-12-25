@@ -115,7 +115,7 @@ class MusicCog(commands.Cog):
                             )
             await interaction.followup.send(embed=error_embed, ephemeral=True)
     
-    # Command to stop the current music and clear the waiting list
+    # Sub-command to stop the current music and clear the waiting list
     @play_group.command(name='stop', description='⏹️ Stop the current music and clear the waiting list.')
     async def stop(self, interaction: discord.Interaction):
         # Get bot's voice_client
@@ -124,7 +124,7 @@ class MusicCog(commands.Cog):
         try:
             await self.ensure_context(interaction)
         except:
-            # Return if we could not ensure
+            # Return if we could not ensure (response is done)
             return
         # Call the cleanup function that will ensure variables cleanup
         await self.cleanup()
@@ -142,8 +142,68 @@ class MusicCog(commands.Cog):
         await interaction.response.send_message(embed=stopped_embed)
         # Start the disconnect timer
         self.disconnect_timer = asyncio.create_task(self.disconnect_after_delay(interaction))
+    
+    # Sub-command to skip the current music
+    @play_group.command(name='skip', description='⏩ Skip the current music.')
+    async def skip(self, interaction: discord.Interaction):
+        # Get bot's voice_client
+        voice_client = interaction.guild.voice_client
+        # Ensure the command can be ran
+        try:
+            await self.ensure_context(interaction)
+        except:
+            # Return if we could not ensure (response is done)
+            return
+        # Try to stop the voice, so the next song will play by triggering the after lambda
+        if voice_client and voice_client.is_playing():
+            try:
+                voice_client.stop()
+            except Exception as e:
+                print(f'[BOT] --- Voice client stop error : {e}')
+        # Tell the channel about the skip
+        if len(self.waitlist) == 0:
+            skipped_embed = discord.Embed(
+                                title=f'⏩ Music skipped by -{interaction.user.name}-.',
+                                description='No more songs in the waiting list.',
+                                color=discord.Color.green()
+                            )
+            await interaction.response.send_message(embed=skipped_embed)
+            return
+        skipped_embed = discord.Embed(
+                                title=f'⏩ Music skipped by -{interaction.user.name}-.',
+                                description=f'Will now play **{self.waitlist[0]["title"]}**.',
+                                color=discord.Color.green()
+                            )
+        await interaction.response.send_message(embed=skipped_embed)
+    
+    # Sub-command to change the volume
+    @play_group.command(name='volume', description='🔊 Change the music volume (0 to 100).')
+    @app_commands.describe(volume="The volume value")
+    async def volume(self, interaction: discord.Interaction, volume: app_commands.Range[int, 0, 100]):
+        # Get bot's voice_client
+        voice_client = interaction.guild.voice_client
+        # Ensure the command can be ran
+        try:
+            await self.ensure_context(interaction)
+        except:
+            # Return if we could not ensure (response is done)
+            return
+        # Try to change the volume using provided value
+        if voice_client and voice_client.is_playing():
+            try:
+                voice_client.source.volume = volume / 100
+            except Exception as e:
+                print(f'[BOT] --- Volume change error : {e}')
+        # Tell the channel about the volume change
+        skipped_embed = discord.Embed(
+                            title=f'🔊 Volume changed to {volume}% by -{interaction.user.name}-.',
+                            color=discord.Color.green()
+                        )
+        await interaction.response.send_message(embed=skipped_embed)
+        # Push the player to the bottom
+        await self.ensure_player()
 
-    # Cleaning up the bot's variables
+    # Clean up the bot's variables
     async def cleanup(self):
         print("[BOT] --- Cleaning up...")
         # Delete previous player if it exists
@@ -212,6 +272,7 @@ class MusicCog(commands.Cog):
         if not bot_voice or not bot_voice.is_playing():
             no_user_embed = discord.Embed(
                     title='❌ The bot is not playing.',
+                    description='Maybe wait for the next song to start ?',
                     color=discord.Color.red()
                 )
             await interaction.response.send_message(embed=no_user_embed, ephemeral=True, delete_after=10)
@@ -264,7 +325,7 @@ class MusicCog(commands.Cog):
                     description="If you wish to play again, join a voice channel and call /play.",
                     color=discord.Color.red()
                 )
-        await interaction.channel.send(embed=no_voice_embed)
+        await interaction.channel.send(embed=no_voice_embed, delete_after=30)
         return None
 
     # Function to play a song in the bot's voice channel, executed everytime a song ends if the waiting list has something in it
