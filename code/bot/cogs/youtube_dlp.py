@@ -82,7 +82,7 @@ async def check_present(query : str):
     # If the query is an URL
     if query.startswith('http://') or query.startswith('https://') or 'www.' in query:
         # Extract the infos
-        result = ytdl_fast.extract_info(query, download=False)
+        result = await asyncio.to_thread(ytdl_fast.extract_info, query, download=False)
         # Check if the id is in loaded_dicts
         if result is not None:
             if result['id'] in loaded_dicts:
@@ -93,7 +93,7 @@ async def check_present(query : str):
     # If the query is not an URL
     else :
         # Extract the infos
-        result = ytdl_fast.extract_info(f'ytsearch:{query}', download=False)
+        result = await asyncio.to_thread(ytdl_fast.extract_info, f'ytsearch:{query}', download=False)
         # Check if the id is in loaded_dicts
         if result is not None and result['entries']:
             song = result['entries'][0]
@@ -260,7 +260,7 @@ class YTDownload:
                 # At this point, result shoud exist because of check_present
                 try:
                     # Extract infos from url
-                    result = ytdl.extract_info(present, download=True)
+                    result = await asyncio.to_thread(ytdl.extract_info, present, download=True)
                     # Save the info dict result in f'code/bot/cogs/temp_dicts/{result['id']}.txt' asynchronously, result from URL has no 'entries' field
                     asyncio.create_task(save_dict_async(result))
                     # Return the info dict result
