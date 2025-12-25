@@ -13,9 +13,9 @@ if not os.path.exists('code/bot/cogs/temp_songs/'):
     os.makedirs('code/bot/cogs/temp_songs/')
 
 # Define cogs extensions
-ext = ['fun', 'music']
+EXTENSIONS = ['fun', 'music_remaster']
 
-print('Starting bot...')
+print('--- Starting bot... ---')
 
 # Check if the Opus library is loaded
 if not discord.opus.is_loaded():
@@ -33,18 +33,27 @@ if not discord.opus.is_loaded():
         raise RuntimeError('Opus failed to load')
 
 class GoonerMusic(commands.Bot):
-    async def on_ready(self):
-        for e in ext:
-            await self.load_extension(f'cogs.{e}')
-
-        # Syncronize the slash commands
+    # Executed at startup
+    async def setup_hook(self):
+        print('--- Loading extensions... ---')
+        for ext in EXTENSIONS:
+            try:
+                await self.load_extension(f'cogs.{ext}')
+                print(f'✅ Loaded {ext}')
+            except Exception as e:
+                print(f'❌ Failed to load {ext}: {e}')
+        
+        # Slash commands sync (for dev, I can do it at every startup)
         try:
-            synced = await bot.tree.sync()
-            print(f'Slash commands syncronized : {len(synced)}')
+            synced = await self.tree.sync()
+            print(f'--- Slash commands synchronized: {len(synced)} ---')
         except Exception as e:
-            print(e)
+            print(f'Sync error: {e}')
 
-        print("Bot initialized.") 
+    # Executed when bot is ready (even after a crash)
+    async def on_ready(self):
+        print(f'--- Logged in as {self.user} (ID: {self.user.id}) ---')
+        print('--- Bot is ready and running. ---')
 
 # Creating the bot
 bot = GoonerMusic(command_prefix='!', intents=discord.Intents.all())
