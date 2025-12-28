@@ -39,9 +39,9 @@ class GoonerMusic(commands.Bot):
         for ext in EXTENSIONS:
             try:
                 await self.load_extension(f'cogs.{ext}')
-                print(f'✅ Loaded {ext}')
+                print(f'*** Loaded {ext} ***')
             except Exception as e:
-                print(f'❌ Failed to load {ext}: {e}')
+                print(f'*** Failed to load {ext}: {e} ***')
         
         # Slash commands sync (for dev, I can do it at every startup)
         try:
