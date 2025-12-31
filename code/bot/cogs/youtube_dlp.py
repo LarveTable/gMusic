@@ -214,8 +214,8 @@ class YTDownload:
 
         # Return the previews as a list of choices (required by discord.py)
         try:
-            # Wait for the search task to complete
-            results = await task
+            # Wait for the search task to complete, but timeout after 2.5s if the previews were too slow to load
+            results = await asyncio.wait_for(task, 2.5)
 
             # If not results, return empty list
             if results is None or not results['entries']:
@@ -227,6 +227,9 @@ class YTDownload:
             ]
         # Do not return any choices if task was cancelled to avoid cache saving
         except asyncio.CancelledError:
+            raise
+        # If task took too long, do not return anything but raise the error to stay silent
+        except asyncio.TimeoutError:
             raise
         # If other exception occurs, log it and return empty list
         except Exception as e:
