@@ -5,6 +5,7 @@ import os
 from cogs.youtube_dlp import YTDownload
 import asyncio
 from collections import deque
+from views.player_view import PlayerContainer, PlayerLayout
 
 class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -27,6 +28,8 @@ class MusicCog(commands.Cog):
         self.current_guild_id = None
         # Lock to secure the UI player
         self.ui_lock = asyncio.Lock()
+        # Store the player's view
+        self.player_view = None
 
     # Creating the group play, which is the master command to play a music
     play_group = app_commands.Group(name='play', description='Play a music from available music sources.')
@@ -110,7 +113,7 @@ class MusicCog(commands.Cog):
                                 )
                 await interaction.edit_original_response(embed=not_found_embed)
         except Exception as e : 
-            print(e)
+            print(f"[BOT] --- Unexpected error : {e}")
             # Unexpected error
             error_embed = discord.Embed(
                                 title=f'❌ Unexpected error.',
@@ -218,9 +221,13 @@ class MusicCog(commands.Cog):
                 except discord.NotFound:
                     # Message was already deleted (by user or by ensure_player)
                     pass
+            # Stop listening to interactions from the view before getting rid of it (memory management)
+            if self.player_view:
+                self.player_view.stop()
         # Clear variables
         self.waitlist.clear()
         self.player = None
+        self.player_view = None
         self.current_voice_channel_id = None
         self.current_guild_id = None
         self.current_text_channel_id = None
@@ -232,16 +239,16 @@ class MusicCog(commands.Cog):
     async def ensure_player(self):
         async with self.ui_lock:
             try:
-                # Retrieve the original player message
-                msg = self.player.embeds[0]
                 # Retrieve the original player message channel
-                channel = self.player.channel
+                channel = self.bot.get_channel(self.current_text_channel_id)
                 # Delete the old player message
                 await self.player.delete()
                 # Send it again
-                self.player = await channel.send(embed=msg)
+                self.player = await channel.send(view=self.player_view)
             except discord.NotFound:
                 pass
+            except Exception as e:
+                raise e
     
     # Function to disconnect the bot after 1 min of inactivity (provided voice client since the cleanup has been done)
     async def disconnect_after_delay(self, voice_client: discord.VoiceProtocol):
@@ -346,6 +353,11 @@ class MusicCog(commands.Cog):
         channel = self.bot.get_channel(self.current_text_channel_id)
         # Delete previous player if it exists
         async with self.ui_lock:
+            # Stop listening to the view's interactions
+            if self.player_view:
+                self.player_view.stop()
+                self.player_view = None
+                
             if self.player:
                 try:
                     await self.player.delete()
@@ -353,25 +365,26 @@ class MusicCog(commands.Cog):
                     # Message was already deleted (by user or by ensure_player)
                     pass
                 self.player = None
-        # If something is in the waiting list
+        # If something is in the waitinpg list
         if len(self.waitlist) > 0:
             # Retrieve the data from the next song in queue
             data = self.waitlist.popleft()
 
-            # Send the player message
-            playing_embed = discord.Embed(
-                    title=f'▶️ Now playing {data["title"]}',
-                    color=discord.Color.green()
-                )
-            playing_embed.set_thumbnail(url=data['thumbnail'])
-            playing_embed.add_field(name='Duration', value=f"{data['duration'] // 60}:{data['duration'] % 60:02d}", inline=True)
-            playing_embed.add_field(name='Uploader', value=data['uploader'], inline=True)
-            playing_embed.add_field(name='Views', value=data['view_count'], inline=True)
-            playing_embed.add_field(name='Likes', value=data['like_count'], inline=True)
-            playing_embed.add_field(name='Upload date', value=data['upload_date'], inline=True)
-            playing_embed.set_footer(text=f'URL: {data["webpage_url"]}')
+            # The player container that will display the player's components
+            player_container = PlayerContainer(
+                accent_colour=discord.Colour.gold(),
+                id=0,
+                cog=self,
+                data=data
+            )
+
             async with self.ui_lock:
-                self.player = await channel.send(embed=playing_embed)
+                # The player view that will contain the player container
+                self.player_view = PlayerLayout(self)
+                # Add the container to the view
+                self.player_view.add_item(player_container)
+                # Send the message with the player view
+                self.player = await channel.send(view=self.player_view)
 
             # Audio source
             source = discord.FFmpegPCMAudio(f'code/bot/cogs/temp_songs/{data["id"]}.{data["ext"]}')
@@ -383,6 +396,7 @@ class MusicCog(commands.Cog):
         else:
             finished_embed = discord.Embed(
                 title='🏁 Finished playing '+os.getenv('FINISHED_PLAYING'),
+                description='Leaving the voice channel in 1 minute.',
                 color=discord.Color.green()
             )
             await channel.send(embed=finished_embed, delete_after=20)
