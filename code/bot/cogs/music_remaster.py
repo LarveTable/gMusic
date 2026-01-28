@@ -30,6 +30,10 @@ class MusicCog(commands.Cog):
         self.ui_lock = asyncio.Lock()
         # Store the player's view
         self.player_view = None
+        # Store the volume
+        self.current_volume = 0.3
+        # Lock to prevent concurrent volume changes
+        self.volume_lock = asyncio.Lock()
 
     # Creating the group play, which is the master command to play a music
     play_group = app_commands.Group(name='play', description='Play a music from available music sources.')
@@ -84,7 +88,7 @@ class MusicCog(commands.Cog):
                     self.waitlist.append(data)
 
                     # Check if the bot is already playing
-                    if not voice_client.is_playing():
+                    if not voice_client.is_playing() and not voice_client.is_paused():
                         # If not, actually play the song
                         await self.play_next()
                     else:
@@ -136,7 +140,7 @@ class MusicCog(commands.Cog):
         # Call the cleanup function that will ensure variables cleanup
         await self.cleanup()
         # Try to stop the voice
-        if voice_client and voice_client.is_playing():
+        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
             try:
                 voice_client.stop()
             except Exception as e:
@@ -162,7 +166,7 @@ class MusicCog(commands.Cog):
             # Return if we could not ensure (response is done)
             return
         # Try to stop the voice, so the next song will play by triggering the after lambda
-        if voice_client and voice_client.is_playing():
+        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
             try:
                 voice_client.stop()
             except Exception as e:
@@ -196,9 +200,17 @@ class MusicCog(commands.Cog):
             # Return if we could not ensure (response is done)
             return
         # Try to change the volume using provided value
-        if voice_client and voice_client.is_playing():
+        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
             try:
-                voice_client.source.volume = volume / 100
+                async with self.volume_lock:
+                    voice_client.source.volume = volume / 100
+                    # Store the new value
+                    self.current_volume = voice_client.source.volume
+                    # Try to get the player container
+                    player_container: PlayerContainer = self.player_view.find_item(0)
+                    if player_container:
+                        # Update the view using the container itself
+                        await player_container.update_volume_command(voice_client)
             except Exception as e:
                 print(f'[BOT] --- Volume change error : {e}')
         # Tell the channel about the volume change
@@ -206,7 +218,7 @@ class MusicCog(commands.Cog):
                             title=f'🔊 Volume changed to {volume}% by -{interaction.user.name}-.',
                             color=discord.Color.green()
                         )
-        await interaction.response.send_message(embed=skipped_embed)
+        await interaction.response.send_message(embed=skipped_embed, delete_after=20)
         # Push the player to the bottom
         await self.ensure_player()
 
@@ -280,7 +292,7 @@ class MusicCog(commands.Cog):
             raise commands.CommandError("User not in a voice channel.")
         
         # If the bot is not in a voice channel or not playing
-        if not bot_voice or not bot_voice.is_playing():
+        if not bot_voice or (not bot_voice.is_playing() and not bot_voice.is_paused()):
             no_user_embed = discord.Embed(
                     title='❌ The bot is not playing.',
                     description='Maybe wait for the next song to start ?',
@@ -389,7 +401,8 @@ class MusicCog(commands.Cog):
             # Audio source
             source = discord.FFmpegPCMAudio(f'code/bot/cogs/temp_songs/{data["id"]}.{data["ext"]}')
             # Audio player (to manage volume)
-            audio_player = discord.PCMVolumeTransformer(source, volume=0.3)
+            async with self.volume_lock:
+                audio_player = discord.PCMVolumeTransformer(source, volume=self.current_volume)
             # Play, 'after' will run this functions everytime the current song ends
             voice_client.play(audio_player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(), self.bot.loop))
         # If there's nothing in the waiting list
@@ -422,7 +435,7 @@ class MusicCog(commands.Cog):
                 # Check if bot is connected to a channel
                 if bot_voice:
                     # If it's playing music and user not in the same channel
-                    if bot_voice.is_playing() and bot_voice.channel != user_voice.channel:
+                    if (bot_voice.is_playing() or bot_voice.is_paused()) and bot_voice.channel != user_voice.channel:
                         # The bot is already playing music in another channel
                         error_embed = discord.Embed(
                             title='❌ The bot is already playing in a different channel.',
@@ -430,7 +443,7 @@ class MusicCog(commands.Cog):
                         )
                         error_exception = commands.CommandError('Bot is playing and author not in the same channel.')
                     # If it's not playing music and user not in the same channel (should not happen but I have to make sure)
-                    elif not bot_voice.is_playing() and bot_voice.channel != user_voice.channel:
+                    elif not bot_voice.is_playing() and not bot_voice.is_paused() and bot_voice.channel != user_voice.channel:
                         # Connect to user's voice channel
                         await bot_voice.disconnect()
                         await user_voice.channel.connect()

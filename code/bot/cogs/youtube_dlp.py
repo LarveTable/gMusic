@@ -228,9 +228,9 @@ class YTDownload:
         # Do not return any choices if task was cancelled to avoid cache saving
         except asyncio.CancelledError:
             raise
-        # If task took too long, do not return anything but raise the error to stay silent
+        # If task took too long, return an empty list, screw the cache
         except asyncio.TimeoutError:
-            raise
+            []
         # If other exception occurs, log it and return empty list
         except Exception as e:
             print(f'[YTDownload] --- Error creating preview choices: {e}')
