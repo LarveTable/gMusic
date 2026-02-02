@@ -16,6 +16,8 @@ class MusicCog(commands.Cog):
         self.play_lock = asyncio.Lock()
         # Waiting list for the songs
         self.waitlist = deque()
+        # Previous song list
+        self.previous_list = deque()
         # Message object for the current player info
         self.player = None
         # Disconnect timer task
@@ -154,6 +156,43 @@ class MusicCog(commands.Cog):
         # Start the disconnect timer
         self.disconnect_timer = asyncio.create_task(self.disconnect_after_delay(voice_client))
     
+    # Sub-command to play the previous song
+    @play_group.command(name='previous', description='⏪ Play the previous song.')
+    async def previous(self, interaction: discord.Interaction):
+        # Get bot's voice_client
+        voice_client = interaction.guild.voice_client
+        # Ensure the command can be run
+        try:
+            await self.ensure_context(interaction)
+        except:
+            # Return if we could not ensure (response is done)
+            return
+        # If the previous list is empty, don't do anything and tell the user
+        if len(self.previous_list) == 0 or len(self.previous_list) == 1:
+            previous_embed = discord.Embed(
+                                title=f'❌ No songs in the previous list.',
+                                color=discord.Color.red()
+                            )
+            await interaction.response.send_message(embed=previous_embed, ephemeral=True, delete_after=10)
+            return
+        # Force the next song to be the previous one (should I put a lock ? -> investigate use-cases)
+        for _ in range(2):
+            # If the bot is playing or paused, play the previous-1 song because the first previous song is the one actually playing
+            self.waitlist.appendleft(self.previous_list.pop())
+    
+        # Try to stop the voice, so the next song will play by triggering the after lambda
+        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+            try:
+                voice_client.stop()
+            except Exception as e:
+                print(f'[BOT] --- Voice client stop error : {e}')
+        previous_embed = discord.Embed(
+                                title=f'⏪ Previous music replayed by -{interaction.user.name}-.',
+                                description=f'Will now play **{self.waitlist[0]["title"]}**.',
+                                color=discord.Color.green()
+                            )
+        await interaction.response.send_message(embed=previous_embed)
+
     # Sub-command to skip the current music
     @play_group.command(name='skip', description='⏩ Skip the current music.')
     async def skip(self, interaction: discord.Interaction):
@@ -238,6 +277,7 @@ class MusicCog(commands.Cog):
                 self.player_view.stop()
         # Clear variables
         self.waitlist.clear()
+        self.previous_list.clear()
         self.player = None
         self.player_view = None
         self.current_voice_channel_id = None
@@ -381,6 +421,9 @@ class MusicCog(commands.Cog):
         if len(self.waitlist) > 0:
             # Retrieve the data from the next song in queue
             data = self.waitlist.popleft()
+            # Push the popped song to the previous song list, to be able to play previously played songs
+            self.previous_list.append(data)
+            # MAYBE HANDLE THE LOOP HERE BY PUSHING THE PREVIOUS BACK INTO THE WAITLIST
 
             # The player container that will display the player's components
             player_container = PlayerContainer(
