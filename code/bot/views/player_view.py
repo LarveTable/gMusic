@@ -100,9 +100,31 @@ class PlayerContainer(ui.Container):
             button.emoji = "▶️" if self.paused else "⏸️"
             await interaction.response.edit_message(view=self.view)
         # Skip button
-        @play_action_row.button(emoji="⏭️", disabled=True)
+        @play_action_row.button(emoji="⏭️")
         async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.send_message('Next', ephemeral=True)
+            # Get bot's voice_client
+            voice_client = interaction.guild.voice_client
+            # Try to stop the voice, so the next song will play by triggering the after lambda
+            if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+                try:
+                    voice_client.stop()
+                except Exception as e:
+                    print(f'[BOT] --- Voice client stop error : {e}')
+            # Tell the channel about the skip
+            if len(self.music_cog.waitlist) == 0:
+                skipped_embed = discord.Embed(
+                                    title=f'⏩ Music skipped by -{interaction.user.name}-.',
+                                    description='No more songs in the waiting list.',
+                                    color=discord.Color.green()
+                                )
+                await interaction.response.send_message(embed=skipped_embed)
+                return
+            skipped_embed = discord.Embed(
+                                    title=f'⏩ Music skipped by -{interaction.user.name}-.',
+                                    description=f'Will now play **{self.music_cog.waitlist[0]["title"]}**.',
+                                    color=discord.Color.green()
+                                )
+            await interaction.response.send_message(embed=skipped_embed)
         # Stop button
         @play_action_row.button(emoji="⏹️", style=discord.ButtonStyle.danger)
         async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):

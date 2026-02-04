@@ -53,7 +53,7 @@ ytdl_opts = {
     #'break_on_existing': True, TO TEST Skips the download if the file is present
     'no_warnings': True, # Suppress warnings, especially the sabr one
     'noplaylist': True, # Don't download playlists
-    'progress_hooks': [], # We will add hooks later, used to track download progress to inform the user
+    #'progress_hooks': [], # We will add hooks later, used to track download progress to inform the user
     #'sleep_interval': 2, # Sleep interval between downloads to avoid rate limiting TO TEST IF NEEDED
     #'sleep_interval_requests' : 1 # Sleep interval between extractions for security (especially if used with infinite AI playlist)
     'quiet': True, # Suppress output except for errors
@@ -65,22 +65,34 @@ ytdl_opts_fast_extractor = {
     'skip_download': True, # Don't download the video/audio
     'noplaylist': True, # Don't download playlists
     'no_warnings': True, # Suppress warnings, especially the sabr one
-    'extractor_args': { # Skip unnecessary extractors to speed up the process
+    'extractor_args': { # Skip unnecessary extractors to speed up the process (but keep webpage and js to allow for the damn po token)
         'youtube': {
-            'player_skip': ['configs', 'webpage', 'js', 'initial_data']
+            'player_skip': ['configs', 'initial_data']
         }
     },
     'sleep_interval_requests' : 0.3, # Sleep interval between extractions for security
     'quiet': True, # Suppress output except for errors
+    #'verbose': True # debug
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_opts) # Load the basic downloader
 ytdl_fast = yt_dlp.YoutubeDL(ytdl_opts_fast_extractor) # Load the fast extractor for search previews
 
 # Check if the song is already downloaded from previous sessions
-async def check_present(query : str):
+async def check_present(query : dict | str):
+    # If the user pressed enter with a provided search result (speeds up the process) (if dict)
+    if isinstance(query, dict):
+        try:
+            if query['id'] in loaded_dicts:
+                    print(f'[YTDownload] --- Song \'{loaded_dicts[query['id']]['title']}\' found in memory.')
+                    return loaded_dicts[query['id']]
+            else:
+                return query['url']
+        except Exception as e:
+            e.add_note('Error on query content in check_present.')
+            raise e
     # If the query is an URL
-    if query.startswith('http://') or query.startswith('https://') or 'www.' in query:
+    elif query.startswith('http://') or query.startswith('https://') or 'www.' in query:
         # Extract the infos
         result = await asyncio.to_thread(ytdl_fast.extract_info, query, download=False)
         # Check if the id is in loaded_dicts
@@ -120,6 +132,7 @@ def remove_files(id):
 # Cache handling function, id can't be already present as checked before calling this function
 async def add_to_cache(id : str):
     global loaded_dicts # Modify the global loaded_dicts
+    global cache # Modify the global cache
     
     # If cache is full
     if len(cache) == cache.maxlen:
@@ -222,7 +235,7 @@ class YTDownload:
                 return []
 
             return [
-                app_commands.Choice(name=entry['title'], value=entry['url'])
+                app_commands.Choice(name=entry['title'], value=json.dumps({'url':entry['url'], 'id':entry['id']}))
                 for entry in results['entries']
             ]
         # Do not return any choices if task was cancelled to avoid cache saving
@@ -245,7 +258,16 @@ class YTDownload:
     # Search from user, either an URL or a query
     @classmethod
     async def search(cls, query : str):
-        print(f'[YTDownload] --- Searching for \'{query}\'...')
+        global cache # This function will modify the cache variable globally
+        # Check if the query is a JSON string (from preview selection)
+        try:
+            # If it is, load it as a dict
+            query = json.loads(query)
+            print('[YTDownload] --- Query is a JSON string, proceeding as dict.')
+        except Exception:
+            print('[YTDownload] --- Query is not a JSON string, proceeding as normal string.')
+            pass
+        print(f'[YTDownload] --- Searching for \'{query if not isinstance(query, dict) else query['url']}\'...')
         # Check if the song is already present in temp_songs, if yes return it
         present = await check_present(query)
         if present is not None:
@@ -259,7 +281,7 @@ class YTDownload:
                 return present
             # If not cached, use the found URL to speed up the process
             elif present.startswith('http://') or present.startswith('https://') or 'www.' in present:
-                print(f'[YTDownload] --- \'{query}\' not found in memory, downloading using found url.')
+                print(f'[YTDownload] --- \'{query if not isinstance(query, dict) else query['url']}\' not found in memory, downloading using found url.')
                 # At this point, result shoud exist because of check_present
                 try:
                     # Extract infos from url
@@ -270,8 +292,8 @@ class YTDownload:
                     print(f'[YTDownload] --- Downloaded \'{result["title"]}\' successfully.')
                     return result
                 except Exception as e:
-                    print(f'[YTDownload] --- Error when downloading or saving result for \'{query}\': {e}')
+                    print(f'[YTDownload] --- Error when downloading or saving result for \'{query if not isinstance(query, dict) else query['url']}\': {e}')
                     raise e
         # Nothing was found
-        print(f'[YTDownload] --- Nothing found for query: \'{query}\'')
+        print(f'[YTDownload] --- Nothing found for query: \'{query if not isinstance(query, dict) else query['url']}\'')
         return None
