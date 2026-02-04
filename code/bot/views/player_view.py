@@ -101,7 +101,7 @@ class PlayerContainer(ui.Container):
             await interaction.response.edit_message(view=self.view)
         # Skip button
         @play_action_row.button(emoji="⏭️")
-        async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             # Get bot's voice_client
             voice_client = interaction.guild.voice_client
             # Try to stop the voice, so the next song will play by triggering the after lambda
