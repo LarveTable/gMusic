@@ -211,6 +211,11 @@ class MusicCog(commands.Cog):
     async def pause_play(self, interaction: discord.Interaction):
         # Get bot's voice_client
         voice_client = interaction.guild.voice_client
+        # Just in case (if we catch exceptions)
+        paused_embed = discord.Embed(
+                            title=f'❌ Unexpected error happened.',
+                            color=discord.Color.red()
+                        )
         # Ensure the command can be ran
         try:
             await self.ensure_context(interaction)
