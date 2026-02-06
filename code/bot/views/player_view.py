@@ -73,9 +73,34 @@ class PlayerContainer(ui.Container):
         # First row containing player related control
         play_action_row = ui.ActionRow()
         # Previous button
-        @play_action_row.button(emoji="⏮️", disabled=True)
+        @play_action_row.button(emoji="⏮️")
         async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.send_message('Previous', ephemeral=True)
+            # Get bot's voice_client
+            voice_client = interaction.guild.voice_client
+            # If the previous list is empty, don't do anything and tell the user
+            if len(self.music_cog.previous_list) == 0 or len(self.music_cog.previous_list) == 1:
+                previous_embed = discord.Embed(
+                                    title=f'❌ No songs in the previous list.',
+                                    color=discord.Color.red()
+                                )
+                await interaction.response.send_message(embed=previous_embed, ephemeral=True, delete_after=10)
+                return
+            # Force the next song to be the previous one (should I put a lock ? -> investigate use-cases)
+            for _ in range(2):
+                # If the bot is playing or paused, play the previous-1 song because the first previous song is the one actually playing
+                self.music_cog.waitlist.appendleft(self.music_cog.previous_list.pop())
+            # Try to stop the voice, so the next song will play by triggering the after lambda
+            if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+                try:
+                    voice_client.stop()
+                except Exception as e:
+                    print(f'[BOT] --- Voice client stop error : {e}')
+            previous_embed = discord.Embed(
+                                    title=f'⏪ Previous music replayed by -{interaction.user.name}-.',
+                                    description=f'Will now play **{self.music_cog.waitlist[0]["title"]}**.',
+                                    color=discord.Color.green()
+                                )
+            await interaction.response.send_message(embed=previous_embed)
         # Play/pause button
         @play_action_row.button(emoji="⏸️")
         async def pause_play_button(self, interaction: discord.Interaction, button: discord.ui.Button):

@@ -235,7 +235,9 @@ class YTDownload:
                 return []
 
             return [
-                app_commands.Choice(name=entry['title'], value=json.dumps({'url':entry['url'], 'id':entry['id']}))
+                # Split the url to prevent exceeding the 'value' field limit
+                app_commands.Choice(name=entry['title'], value=json.dumps({'url':entry['url'].split('https://www.youtube.com', 1)[1], 
+                                                                           'id':entry['id']}, separators=(',', ':')))
                 for entry in results['entries']
             ]
         # Do not return any choices if task was cancelled to avoid cache saving
@@ -259,14 +261,7 @@ class YTDownload:
     @classmethod
     async def search(cls, query : str):
         global cache # This function will modify the cache variable globally
-        # Check if the query is a JSON string (from preview selection)
-        try:
-            # If it is, load it as a dict
-            query = json.loads(query)
-            print('[YTDownload] --- Query is a JSON string, proceeding as dict.')
-        except Exception:
-            print('[YTDownload] --- Query is not a JSON string, proceeding as normal string.')
-            pass
+        
         print(f'[YTDownload] --- Searching for \'{query if not isinstance(query, dict) else query['url']}\'...')
         # Check if the song is already present in temp_songs, if yes return it
         present = await check_present(query)

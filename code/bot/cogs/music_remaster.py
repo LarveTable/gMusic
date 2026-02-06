@@ -6,6 +6,7 @@ from cogs.youtube_dlp import YTDownload
 import asyncio
 from collections import deque
 from views.player_view import PlayerContainer, PlayerLayout
+import json
 
 class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -60,9 +61,21 @@ class MusicCog(commands.Cog):
             self.disconnect_timer.cancel()
             self.disconnect_timer = None
             print("[BOT] --- Cancelled inactivity timer.")
+
+        # Check if the query is a JSON string (from preview selection)
+        try:
+            # If it is, load it as a dict
+            query = json.loads(query)
+            # Paste back the stripped part
+            query['url'] = 'https://www.youtube.com'+query['url']
+            print('[BOT] --- Query is a JSON string, proceeding as dict.')
+        except Exception:
+            print('[BOT] --- Query is not a JSON string, proceeding as normal string.')
+            pass
+
         # Tell the user that the search is initiated
         searching_embed = discord.Embed(
-                    title=f'🔍 Searching for **{query}** on YouTube...',
+                    title=f'🔍 Searching for **{query if not isinstance(query, dict) else query['url']}** on YouTube...',
                     description=os.getenv('SEARCHING'),
                     color=discord.Color.orange()
                 )
