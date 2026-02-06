@@ -31,7 +31,7 @@ class PlayerLayout(ui.LayoutView):
 # The container used in the PlayerView, displays every element of the player, using v2 components
 class PlayerContainer(ui.Container):
         # ID of the PlayerContainer will always be 0 to find it easily
-        def __init__(self, cog: "MusicCog", data: dict, id = None, accent_colour = None):
+        def __init__(self, cog: "MusicCog", data: dict, id = 0, accent_colour = None):
             super().__init__(accent_colour=accent_colour, id=id)
             # State of the play/pause button
             self.paused = False
@@ -102,9 +102,9 @@ class PlayerContainer(ui.Container):
                                 )
             await interaction.response.send_message(embed=previous_embed)
         # Play/pause button
-        @play_action_row.button(emoji="⏸️")
+        @play_action_row.button(emoji="⏸️", id=3)
         async def pause_play_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-             # Get bot's voice_client
+            # Get bot's voice_client
             voice_client = interaction.guild.voice_client
             # If the bot is connected and playing
             if voice_client and voice_client.is_playing():
@@ -266,3 +266,12 @@ class PlayerContainer(ui.Container):
                 mute_button.style = discord.ButtonStyle.secondary
                 # Update the muted variable in the container
                 self.muted = False
+
+        # Command to update the view when user calls /play pause/resume
+        async def update_pause_command(self):
+            # Pause/resume display in the view
+            pause_display = self.play_action_row.find_item(3)
+            if pause_display:
+                # Invert the paused state and change the emoji
+                self.paused = not self.paused
+                pause_display.emoji = "▶️" if self.paused else "⏸️"

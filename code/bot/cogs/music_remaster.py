@@ -206,6 +206,49 @@ class MusicCog(commands.Cog):
                             )
         await interaction.response.send_message(embed=previous_embed)
 
+    # Sub-command to pause the current music
+    @play_group.command(name='pause-resume', description='⏯️ Pause/Resume the current music.')
+    async def pause_play(self, interaction: discord.Interaction):
+        # Get bot's voice_client
+        voice_client = interaction.guild.voice_client
+        # Ensure the command can be ran
+        try:
+            await self.ensure_context(interaction)
+        except:
+            # Return if we could not ensure (response is done)
+            return
+        # If the bot is connected and playing
+        if voice_client and voice_client.is_playing():
+            try:
+                # Try to pause
+                voice_client.pause()
+                paused_embed = discord.Embed(
+                            title=f'▶️ Music paused by -{interaction.user.name}-.',
+                            color=discord.Color.green()
+                        )
+            except Exception as e:
+                print(f'[BOT] --- Voice client pause error : {e}')
+        # If the voice client is connected
+        elif voice_client and voice_client.is_paused():
+            try:
+                # Try to resume
+                voice_client.resume()
+                paused_embed = discord.Embed(
+                            title=f'⏸️ Music resumed by -{interaction.user.name}-.',
+                            color=discord.Color.green()
+                        )
+            except Exception as e:
+                print(f'[BOT] --- Voice client resume error : {e}')
+        # Try to get the player container
+        player_container: PlayerContainer = self.player_view.find_item(0)
+        if player_container:
+            # Update the view using the container itself
+            await player_container.update_pause_command()
+        # Tell the channel about the pause/resume
+        await interaction.response.send_message(embed=paused_embed, delete_after=20)
+        # Push the player to the bottom
+        await self.ensure_player()
+
     # Sub-command to skip the current music
     @play_group.command(name='skip', description='⏩ Skip the current music.')
     async def skip(self, interaction: discord.Interaction):
