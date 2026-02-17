@@ -37,8 +37,6 @@ class PlayerContainer(ui.Container):
             self.paused = False
             # State of the mute button
             self.muted = False
-            # State of the loop button
-            self.loop = False
             # Get the music cog to access its variables and methods
             self.music_cog = cog
             # The current song data
@@ -49,6 +47,10 @@ class PlayerContainer(ui.Container):
             self.data_section.accessory = ui.Thumbnail(media=data['thumbnail'])
             self.data_section.clear_items()
             self.data_section.add_item(ui.TextDisplay(content=f"# **{data["title"]}**\n*{data['uploader']}*\n\n⏱️*{data['duration'] // 60}:{data['duration'] % 60:02d}*"))
+            loop_button = self.misc_action_row.find_item(4)
+            if loop_button:
+                loop_button.label = "On" if self.music_cog.loop else "Off"
+                loop_button.style = discord.ButtonStyle.success if self.music_cog.loop else discord.ButtonStyle.secondary
             # Get the music cog current volume to display it
             volume_display = self.volume_action_row.find_item(1)
             if volume_display:
@@ -85,6 +87,10 @@ class PlayerContainer(ui.Container):
                                 )
                 await interaction.response.send_message(embed=previous_embed, ephemeral=True, delete_after=10)
                 return
+            
+            # Deactivate the loop option
+            self.music_cog.loop = False
+
             # Force the next song to be the previous one (should I put a lock ? -> investigate use-cases)
             for _ in range(2):
                 # If the bot is playing or paused, play the previous-1 song because the first previous song is the one actually playing
@@ -136,6 +142,15 @@ class PlayerContainer(ui.Container):
                 except Exception as e:
                     print(f'[BOT] --- Voice client stop error : {e}')
             # Tell the channel about the skip
+            # If looping
+            if self.music_cog.loop:
+                skipped_embed = discord.Embed(
+                                    title=f'🔁 Loop option is active, playing the same song again.',
+                                    color=discord.Color.green()
+                                )
+                await interaction.response.send_message(embed=skipped_embed)
+                return
+            # If wait list empty
             if len(self.music_cog.waitlist) == 0:
                 skipped_embed = discord.Embed(
                                     title=f'⏩ Music skipped by -{interaction.user.name}-.',
@@ -144,6 +159,7 @@ class PlayerContainer(ui.Container):
                                 )
                 await interaction.response.send_message(embed=skipped_embed)
                 return
+            # If skipping normally
             skipped_embed = discord.Embed(
                                     title=f'⏩ Music skipped by -{interaction.user.name}-.',
                                     description=f'Will now play **{self.music_cog.waitlist[0]["title"]}**.',
@@ -238,11 +254,11 @@ class PlayerContainer(ui.Container):
         # Last row containing misc buttons
         misc_action_row = ui.ActionRow()
         # Loop song button
-        @misc_action_row.button(emoji="🔁", label="Off", disabled=True)
+        @misc_action_row.button(emoji="🔁", label="Off", id=4)
         async def loop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            self.loop = not self.loop
-            button.label = "On" if self.loop else "Off"
-            button.style = discord.ButtonStyle.success if self.loop else discord.ButtonStyle.secondary
+            self.music_cog.loop = not self.music_cog.loop
+            button.label = "On" if self.music_cog.loop else "Off"
+            button.style = discord.ButtonStyle.success if self.music_cog.loop else discord.ButtonStyle.secondary
             await interaction.response.edit_message(view=self.view)
         # Show waiting list button
         @misc_action_row.button(emoji="🗄️", style=discord.ButtonStyle.primary, disabled=True)

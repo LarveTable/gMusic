@@ -32,11 +32,13 @@ class MusicCog(commands.Cog):
         # Lock to secure the UI player
         self.ui_lock = asyncio.Lock()
         # Store the player's view
-        self.player_view = None
-        # Store the volume
-        self.current_volume = 0.3
+        self.player_view: PlayerLayout = None
+        # Store the volume, default value on startup
+        self.current_volume = 0.1
         # Lock to prevent concurrent volume changes
         self.volume_lock = asyncio.Lock()
+        # Loop state (set by the player container)
+        self.loop = False
 
     # Creating the group play, which is the master command to play a music
     play_group = app_commands.Group(name='play', description='Play a music from available music sources.')
@@ -188,10 +190,15 @@ class MusicCog(commands.Cog):
                             )
             await interaction.response.send_message(embed=previous_embed, ephemeral=True, delete_after=10)
             return
-        # Force the next song to be the previous one (should I put a lock ? -> investigate use-cases)
-        for _ in range(2):
-            # If the bot is playing or paused, play the previous-1 song because the first previous song is the one actually playing
-            self.waitlist.appendleft(self.previous_list.pop())
+
+        # Deactivate the loop option
+        self.loop = False
+
+        # Force the next song to be the previous one
+        async with self.play_lock:
+            for _ in range(2):
+                # If the bot is playing or paused, play the previous-1 song because the first previous song is the one actually playing
+                self.waitlist.appendleft(self.previous_list.pop())
     
         # Try to stop the voice, so the next song will play by triggering the after lambda
         if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
@@ -272,6 +279,15 @@ class MusicCog(commands.Cog):
             except Exception as e:
                 print(f'[BOT] --- Voice client stop error : {e}')
         # Tell the channel about the skip
+        # If looping
+        if self.loop:
+            skipped_embed = discord.Embed(
+                                title=f'🔁 Loop option is active, playing the same song again.',
+                                color=discord.Color.green()
+                            )
+            await interaction.response.send_message(embed=skipped_embed)
+            return
+        # If wait list empty
         if len(self.waitlist) == 0:
             skipped_embed = discord.Embed(
                                 title=f'⏩ Music skipped by -{interaction.user.name}-.',
@@ -280,6 +296,7 @@ class MusicCog(commands.Cog):
                             )
             await interaction.response.send_message(embed=skipped_embed)
             return
+        # If skipping normally
         skipped_embed = discord.Embed(
                                 title=f'⏩ Music skipped by -{interaction.user.name}-.',
                                 description=f'Will now play **{self.waitlist[0]["title"]}**.',
@@ -478,13 +495,17 @@ class MusicCog(commands.Cog):
                     # Message was already deleted (by user or by ensure_player)
                     pass
                 self.player = None
+
+        # If the loop option is turned on, play the previous song again
+        if (self.loop):
+            self.waitlist.appendleft(self.previous_list.pop())
+
         # If something is in the waitinpg list
         if len(self.waitlist) > 0:
             # Retrieve the data from the next song in queue
             data = self.waitlist.popleft()
             # Push the popped song to the previous song list, to be able to play previously played songs
             self.previous_list.append(data)
-            # MAYBE HANDLE THE LOOP HERE BY PUSHING THE PREVIOUS BACK INTO THE WAITLIST
 
             # The player container that will display the player's components
             player_container = PlayerContainer(
