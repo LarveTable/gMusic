@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import ui
 from typing import TYPE_CHECKING
 import asyncio
+from views.waiting_list_view import ListLayout
 
 if TYPE_CHECKING:
     from cogs.music_remaster import MusicCog
@@ -25,7 +26,7 @@ class PlayerLayout(ui.LayoutView):
             return False
         # If there's another error
         except Exception as e:
-            print(f"Erreur dans interaction_check: {e}")
+            print(f"Error in interaction_check: {e}")
             return False
         
 # The container used in the PlayerView, displays every element of the player, using v2 components
@@ -261,9 +262,10 @@ class PlayerContainer(ui.Container):
             button.style = discord.ButtonStyle.success if self.music_cog.loop else discord.ButtonStyle.secondary
             await interaction.response.edit_message(view=self.view)
         # Show waiting list button
-        @misc_action_row.button(emoji="🗄️", style=discord.ButtonStyle.primary, disabled=True)
+        @misc_action_row.button(label="List", style=discord.ButtonStyle.primary)
         async def waitlist_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.send_message('Waitlist', ephemeral=True)
+            list_view = ListLayout(self.music_cog.waitlist, self.music_cog.previous_list[len(self.music_cog.previous_list)-1])
+            await interaction.response.send_message(view=list_view, ephemeral=True, delete_after=30)
         # Favorite button
         @misc_action_row.button(emoji="⭐", style=discord.ButtonStyle.primary, disabled=True)
         async def favorite_button(self, interaction: discord.Interaction, button: discord.ui.Button):

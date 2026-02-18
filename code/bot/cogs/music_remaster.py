@@ -34,7 +34,7 @@ class MusicCog(commands.Cog):
         # Store the player's view
         self.player_view: PlayerLayout = None
         # Store the volume, default value on startup
-        self.current_volume = 0.1
+        self.current_volume = 0.05
         # Lock to prevent concurrent volume changes
         self.volume_lock = asyncio.Lock()
         # Loop state (set by the player container)
