@@ -537,7 +537,7 @@ class MusicCog(commands.Cog):
                 description='Leaving the voice channel in 1 minute.',
                 color=discord.Color.green()
             )
-            await channel.send(embed=finished_embed, delete_after=20)
+            await channel.send(embed=finished_embed)
             # Start the disconnect timer if the bot is still in the voice channel
             if voice_client and voice_client.is_connected():
                 # Clean up before the disconnect happens
