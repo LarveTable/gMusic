@@ -104,28 +104,29 @@ class MusicCog(commands.Cog):
                 async with self.play_lock:
                     # Add the song to the waitlist
                     self.waitlist.append(data)
+                    # Check if the bot is already playing and store the check
+                    not_active_check = not voice_client.is_playing() and not voice_client.is_paused()
 
-                    # Check if the bot is already playing
-                    if not voice_client.is_playing() and not voice_client.is_paused():
-                        # If not, actually play the song
-                        await self.play_next()
-                    else:
-                        # The song stays in the waitlist while the current one is playing
-                        waitlist_embed = discord.Embed(
-                                title=f'⏳ **{data["title"]}** has been added to the waiting list !',
-                                description=f'Already playing music, '+ os.getenv('ALREADY_PLAYING')+f'\nPosition #{len(self.waitlist)}',
-                                color=discord.Color.green()
-                            )
-                        await interaction.edit_original_response(embed=waitlist_embed)
-                        # Send a message to the channel for everyone to see
-                        global_waitlist_embed = discord.Embed(
-                                title=f'⏳ **{data["title"]}** has been added to the waiting list by -'+f'{interaction.user.name}-',
-                                description=f'Position #{len(self.waitlist)}',
-                                color=discord.Color.green()
-                            )
-                        await interaction.channel.send(embed=global_waitlist_embed)
-                        # Push the player message back to the bottom to prevent it from being too far up due to the waitlist messages
-                        await self.ensure_player()
+                # If the bot is not already playing
+                if not_active_check:
+                    await self.play_next()
+                else:
+                    # The song stays in the waitlist while the current one is playing
+                    waitlist_embed = discord.Embed(
+                            title=f'⏳ **{data["title"]}** has been added to the waiting list !',
+                            description=f'Already playing music, '+ os.getenv('ALREADY_PLAYING')+f'\nPosition #{len(self.waitlist)}',
+                            color=discord.Color.green()
+                        )
+                    await interaction.edit_original_response(embed=waitlist_embed)
+                    # Send a message to the channel for everyone to see
+                    global_waitlist_embed = discord.Embed(
+                            title=f'⏳ **{data["title"]}** has been added to the waiting list by -'+f'{interaction.user.name}-',
+                            description=f'Position #{len(self.waitlist)}',
+                            color=discord.Color.green()
+                        )
+                    await interaction.channel.send(embed=global_waitlist_embed)
+                    # Push the player message back to the bottom to prevent it from being too far up due to the waitlist messages
+                    await self.ensure_player()
             # No results found
             else:
                 not_found_embed = discord.Embed(
@@ -510,17 +511,24 @@ class MusicCog(commands.Cog):
                     pass
                 self.player = None
 
-        # If the loop option is turned on, play the previous song again
-        if (self.loop):
-            self.waitlist.appendleft(self.previous_list.pop())
+        # Lock for certain race conditions, for example when the bot's cleanup is executed at the same time
+        async with self.play_lock:
+            # If the loop option is turned on, play the previous song again
+            if (self.loop):
+                self.waitlist.appendleft(self.previous_list.pop())
 
-        # If something is in the waitinpg list
-        if len(self.waitlist) > 0:
-            # Retrieve the data from the next song in queue
-            data = self.waitlist.popleft()
-            # Push the popped song to the previous song list, to be able to play previously played songs
-            self.previous_list.append(data)
-
+            # If something is in the waitinpg list
+            if len(self.waitlist) > 0:
+                # Retrieve the data from the next song in queue
+                data = self.waitlist.popleft()
+                # Push the popped song to the previous song list, to be able to play previously played songs
+                self.previous_list.append(data)
+            else:
+                # If nothing is in the waiting list
+                data = None
+                
+        # If the waiting list was not empty
+        if data:
             # The player container that will display the player's components
             player_container = PlayerContainer(
                 accent_colour=discord.Colour.gold(),
@@ -557,7 +565,7 @@ class MusicCog(commands.Cog):
                 # Clean up before the disconnect happens
                 await self.cleanup()
                 self.disconnect_timer = asyncio.create_task(self.disconnect_after_delay(voice_client))
-        
+    
     # Ensure the bot is/will connected/connect to the user voice channel, and store the useful ids
     async def ensure_voice(self, interaction: discord.Interaction):
         # Initialize error variables
