@@ -7,6 +7,7 @@ import asyncio
 from collections import deque
 from views.player_view import PlayerContainer, PlayerLayout
 import json
+from views.waiting_list_view import ListLayout
 
 class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -338,6 +339,19 @@ class MusicCog(commands.Cog):
         await interaction.response.send_message(embed=skipped_embed, delete_after=20)
         # Push the player to the bottom
         await self.ensure_player()
+
+    # Sub-command to display the waiting list
+    @play_group.command(name='list', description='📋 Diplay the current waiting list.')
+    async def list(self, interaction: discord.Interaction):
+        # Ensure the command can be ran
+        try:
+            await self.ensure_context(interaction)
+        except:
+            # Return if we could not ensure (response is done)
+            return
+        # The view used to display the list
+        list_view = ListLayout(self.waitlist, self.previous_list[len(self.previous_list)-1])
+        await interaction.response.send_message(view=list_view, ephemeral=True, delete_after=30)
 
     # Clean up the bot's variables
     async def cleanup(self):
