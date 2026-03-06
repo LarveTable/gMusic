@@ -102,10 +102,13 @@ class MusicCog(commands.Cog):
 
                 # Enter the lock
                 async with self.play_lock:
-                    # Add the song to the waitlist
-                    self.waitlist.append(data)
-                    # Check if the bot is already playing and store the check
-                    not_active_check = not voice_client.is_playing() and not voice_client.is_paused()
+                    # Add the song to the waitlist if no cleanup has been done
+                    if not self.current_voice_channel_id or not self.current_guild_id or not self.current_text_channel_id:
+                        print(f"[BOT] --- Finished downloading a song after cleaning up, not adding to the waiting list.")
+                    else:
+                        self.waitlist.append(data)
+                    # Check if the bot is already playing or something will play and store the check
+                    not_active_check = not voice_client.is_playing() and not voice_client.is_paused() and not len(self.waitlist) > 1
 
                 # If the bot is not already playing
                 if not_active_check:
@@ -387,9 +390,10 @@ class MusicCog(commands.Cog):
                 # Retrieve the original player message channel
                 channel = self.bot.get_channel(self.current_text_channel_id)
                 # Delete the old player message
-                await self.player.delete()
-                # Send it again
-                self.player = await channel.send(view=self.player_view)
+                if self.player:
+                    await self.player.delete()
+                    # Send it again
+                    self.player = await channel.send(view=self.player_view)
             except discord.NotFound:
                 pass
             except Exception as e:
@@ -489,6 +493,17 @@ class MusicCog(commands.Cog):
 
     # Function to play a song in the bot's voice channel, executed everytime a song ends if the waiting list has something in it
     async def play_next(self):
+        # Peak at the next song
+        async with self.play_lock:
+            if len(self.waitlist) > 0:
+                data = self.waitlist[0]
+            else: 
+                data = None
+        # If the next song is not downloaded yet (i.e added via favorites), download it now
+        if data and not os.path.exists(f'code/bot/cogs/temp_songs/{data["id"]}.{data["ext"]}'):
+            # This takes a long time so it should be ran before ensure_next in case a cleanup happens while downloading
+            await YTDownload.search(data['webpage_url'])
+
         # Ensure we can play the next song with a valid voice_client
         voice_client = await self.ensure_next()
         # If voice_client not valid, we cannot continue, cleanup has been done and user has been notified
@@ -526,7 +541,7 @@ class MusicCog(commands.Cog):
             else:
                 # If nothing is in the waiting list
                 data = None
-                
+                 
         # If the waiting list was not empty
         if data:
             # The player container that will display the player's components

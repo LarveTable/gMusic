@@ -177,7 +177,7 @@ async def save_dict_async(info : dict):
     # Update the loaded_dicts in memory
     loaded_dicts[essential_fields['id']] = essential_fields
     print(f'[YTDownload] --- Added \'{info["title"]}\' to memory dicts.')
-    print(f'[YTDownload] --- Saved dict for \'{info["title"]}\' asynchronously.')
+    print(f'[YTDownload] --- Saved dict on disk for \'{info["title"]}\' asynchronously.')
 
 class YTDownload:
 
