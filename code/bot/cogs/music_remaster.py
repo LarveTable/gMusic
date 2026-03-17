@@ -490,9 +490,9 @@ class MusicCog(commands.Cog):
                 )
         await self.bot.get_channel(self.current_text_channel_id).send(embed=no_voice_embed, delete_after=30)
         return None
-
-    # Function to play a song in the bot's voice channel, executed everytime a song ends if the waiting list has something in it
-    async def play_next(self):
+    
+    # Handle the late_download of a song if needed
+    async def late_download(self, voice_client):
         # Peak at the next song
         async with self.play_lock:
             if len(self.waitlist) > 0:
@@ -501,9 +501,31 @@ class MusicCog(commands.Cog):
                 data = None
         # If the next song is not downloaded yet (i.e added via favorites), download it now
         if data and not os.path.exists(f'code/bot/cogs/temp_songs/{data["id"]}.{data["ext"]}'):
-            # This takes a long time so it should be ran before ensure_next in case a cleanup happens while downloading
+            # Late download embed
+            late = discord.Embed(
+                    title=f'⬇️ Song is not downloaded yet.',
+                    description="Downloading it...",
+                    color=discord.Color.orange()
+                )
+            # Get the channel (should exist now thanks to the previous ensure_next) and send a notification
+            msg = await self.bot.get_channel(self.current_text_channel_id).send(embed=late)
+            # This takes a long time so ensure_next should be ran again in case a cleanup happened for example
             await YTDownload.search(data['webpage_url'])
+            # Delete the notification
+            try:
+                await msg.delete()
+            except Exception as e:
+                print(f"[BOT] --- Could not delete late_download notification, already deleted ? : {e}")
+            # Ensure we can play the next song with a valid voice_client
+            voice_client = await self.ensure_next()
+            # If voice_client not valid, we cannot continue, cleanup has been done and user has been notified
+            if not voice_client:
+                return None
+        # Either we return the old voice client or the fresh one
+        return voice_client
 
+    # Function to play a song in the bot's voice channel, executed everytime a song ends if the waiting list has something in it
+    async def play_next(self):
         # Ensure we can play the next song with a valid voice_client
         voice_client = await self.ensure_next()
         # If voice_client not valid, we cannot continue, cleanup has been done and user has been notified
@@ -525,6 +547,12 @@ class MusicCog(commands.Cog):
                     # Message was already deleted (by user or by ensure_player)
                     pass
                 self.player = None
+        
+        # Check the next song is not downloaded (added via favorites or deleted because of cache full)
+        voice_client = await self.late_download(voice_client)
+        if not voice_client:
+            return
+        channel = self.bot.get_channel(self.current_text_channel_id)
 
         # Lock for certain race conditions, for example when the bot's cleanup is executed at the same time
         async with self.play_lock:
