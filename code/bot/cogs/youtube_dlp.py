@@ -11,7 +11,7 @@ import glob
 active_search_tasks = {}
 
 # Queue of cached songs to delete de oldest fast
-cache = deque(maxlen=20) # Max 20 songs in cache
+cache = deque(maxlen=40) # Max 20 songs in cache
 
 # Dictionary to store loaded info dicts
 loaded_dicts = {}
