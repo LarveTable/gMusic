@@ -1,3 +1,4 @@
+import aiosqlite
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -8,10 +9,13 @@ from collections import deque
 from views.player_view import PlayerContainer, PlayerLayout
 import json
 from views.waiting_list_view import ListLayout
+from views.favorites_view import FavoritesLayout
 
 class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # Path to the music db (to store favorites)
+        self.db_path = "code/bot/music.db"
         # Lock to secure concurrent ensure_voice calls (via /play youtube)
         self.ensure_voice_lock = asyncio.Lock()
         # Lock to secure concurrent play calls, when choosing between playing and waitlist
@@ -43,6 +47,9 @@ class MusicCog(commands.Cog):
 
     # Creating the group play, which is the master command to play a music
     play_group = app_commands.Group(name='play', description='Play a music from available music sources.')
+
+    # Favorites group
+    favorites_group = app_commands.Group(name='favorites', description='Manage and play your favorite songs.')
     
     # Sub-command to play a music from a Youtube link or title
     @play_group.command(name='youtube', description='⏯️ Play a music from a Youtube link or title.')
@@ -356,6 +363,32 @@ class MusicCog(commands.Cog):
         # The view used to display the list
         list_view = ListLayout(self.waitlist, self.previous_list[len(self.previous_list)-1])
         await interaction.response.send_message(view=list_view, ephemeral=True, delete_after=30)
+    
+    # Sub-command to display the user's favorites
+    @favorites_group.command(name='list', description='⭐ Display your favorites list.')
+    async def favorites_list(self, interaction: discord.Interaction):
+        # The view used to display the favorites
+        try:
+            favorites = await self.get_favorites(interaction.user.id)
+            favorites_view = FavoritesLayout(favorites)
+        # If there was an error creating the view (db error for example)
+        except Exception as e:
+            error_embed = discord.Embed(
+                    title=f'❌ Unexpected error happened while retrieving favorites.',
+                    description='Check console for more details.',
+                    color=discord.Color.red()
+            )
+            print(f"[BOT] --- Error creating favorites view: {e}")
+            await interaction.response.send_message(embed=error_embed, ephemeral=True)
+            return
+        await interaction.response.send_message(view=favorites_view, ephemeral=True, delete_after=60)
+    
+    # Get the favorites list for a user from the db
+    async def get_favorites(self, user_id):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("SELECT url, title FROM user_favorites WHERE user_id = ?", (str(user_id),))
+            rows = await cursor.fetchall()
+            return [(row[0], row[1]) for row in rows]
 
     # Clean up the bot's variables
     async def cleanup(self):

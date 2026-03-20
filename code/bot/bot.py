@@ -14,6 +14,7 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS user_favorites (
                 user_id TEXT NOT NULL,
                 url TEXT NOT NULL,
+                title TEXT,
                 added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, url)
             )

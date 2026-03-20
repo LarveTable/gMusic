@@ -4,6 +4,7 @@ from discord import ui
 from typing import TYPE_CHECKING
 import asyncio
 from views.waiting_list_view import ListLayout
+import aiosqlite
 
 if TYPE_CHECKING:
     from cogs.music_remaster import MusicCog
@@ -267,9 +268,37 @@ class PlayerContainer(ui.Container):
             list_view = ListLayout(self.music_cog.waitlist, self.music_cog.previous_list[len(self.music_cog.previous_list)-1])
             await interaction.response.send_message(view=list_view, ephemeral=True, delete_after=30)
         # Favorite button
-        @misc_action_row.button(emoji="⭐", style=discord.ButtonStyle.primary, disabled=True)
+        @misc_action_row.button(emoji="⭐", style=discord.ButtonStyle.primary)
         async def favorite_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.send_message('Favorite', ephemeral=True)
+            favorite_embed = discord.Embed(
+                                title=f'✅ {self.data["title"]} was added to your favorites.',
+                                color=discord.Color.green()
+                            )
+            # Try to add the song to the user's favorites
+            try:
+                await self.add_favorite(interaction.user.id, self.data["webpage_url"], self.data.get("title", "Unknown"))
+            # If the song already exists
+            except aiosqlite.IntegrityError:
+                print(f"[BOT] --- User {interaction.user.id} already has {self.data["webpage_url"]} in favorites.")
+                favorite_embed = discord.Embed(
+                                title=f'❌ The song is already in your favorites list.',
+                                color=discord.Color.orange()
+                            )
+            # Unexpected error
+            except Exception as e:
+                print(f"[BOT] --- Unexpected error : {e}")
+                favorite_embed = discord.Embed(
+                                title=f'❌ Failed to add to favorites.',
+                                description='Check console for details.',
+                                color=discord.Color.red()
+                            )
+            await interaction.response.send_message(embed=favorite_embed, ephemeral=True, delete_after=30)
+
+        async def add_favorite(self, user_id, url, title):
+            # Connect to db and store the favorite
+            async with aiosqlite.connect(self.music_cog.db_path) as db:
+                await db.execute("INSERT INTO user_favorites (user_id, url, title) VALUES (?, ?, ?)", (str(user_id), url, title))
+                await db.commit()
 
         # Command to update the view when the user calls "/play volume", or lower and up volume
         async def update_volume_command(self, voice_client):
