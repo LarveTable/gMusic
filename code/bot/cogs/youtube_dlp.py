@@ -153,29 +153,32 @@ async def add_to_cache(id : str):
         cache.append(id)
     print(f'[YTDownload] --- Added id \'{id}\' to cache.')
 
+# Prune data
+def prune_data(data: dict):
+    essential_fields = {
+        'id': data.get('id'),
+        'title': data.get('title'),
+        'webpage_url': data.get('webpage_url'),
+        'ext': data.get('ext'),
+        'uploader': data.get('uploader'),
+        'duration': data.get('duration'),
+        'thumbnail': data.get('thumbnail'),
+        'view_count': data.get('view_count'),
+        'like_count': data.get('like_count'),
+        'upload_date': data.get('upload_date'),
+    }
+    return essential_fields
+
 # Asynchronously save the info dict to a text file
 async def save_dict_async(info : dict):
     global loaded_dicts # Modify the global loaded_dicts
-    # Extract only JSON-serializable fields
-    essential_fields = {
-        'id': info.get('id'),
-        'title': info.get('title'),
-        'webpage_url': info.get('webpage_url'),
-        'ext': info.get('ext'),
-        'uploader': info.get('uploader'),
-        'duration': info.get('duration'),
-        'thumbnail': info.get('thumbnail'),
-        'view_count': info.get('view_count'),
-        'like_count': info.get('like_count'),
-        'upload_date': info.get('upload_date'),
-    }
     # Save the essential fields as JSON
     with open(f'code/bot/cogs/temp_dicts/{info["id"]}.txt', 'w') as f:
-        json.dump(essential_fields, f)
+        json.dump(info, f)
     # Add to circular cache
-    await add_to_cache(essential_fields['id'])
+    await add_to_cache(info['id'])
     # Update the loaded_dicts in memory
-    loaded_dicts[essential_fields['id']] = essential_fields
+    loaded_dicts[info['id']] = info
     print(f'[YTDownload] --- Added \'{info["title"]}\' to memory dicts.')
     print(f'[YTDownload] --- Saved dict on disk for \'{info["title"]}\' asynchronously.')
 
@@ -281,6 +284,7 @@ class YTDownload:
                 try:
                     # Extract infos from url
                     result = await asyncio.to_thread(ytdl.extract_info, present, download=True)
+                    result = prune_data(result) # Prune the result to only keep essential fields
                     # Save the info dict result in f'code/bot/cogs/temp_dicts/{result['id']}.txt' asynchronously, result from URL has no 'entries' field
                     asyncio.create_task(save_dict_async(result))
                     # Return the info dict result

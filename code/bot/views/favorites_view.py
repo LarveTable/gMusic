@@ -23,9 +23,9 @@ class FavoritesLayout(ui.LayoutView):
             self.add_item(ui.TextDisplay(content="You have no favorites yet."))
         else:
             # Display 6 favorites
-            for url, title in self.favorites[(self.page-1)*6:self.page*6]:
-                self.add_item(ui.TextDisplay(content=f"**{title}**"))
-                self.add_item(ui.TextDisplay(content=url))
+            for data in self.favorites[(self.page-1)*6:self.page*6]:
+                self.add_item(ui.TextDisplay(content=f"**{data['title']}**"))
+                self.add_item(ui.TextDisplay(content=data['webpage_url']))
                 self.add_item(ui.Separator())
 
         # Add the pagination buttons

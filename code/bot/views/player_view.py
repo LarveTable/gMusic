@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import asyncio
 from views.waiting_list_view import ListLayout
 import aiosqlite
+import json
 
 if TYPE_CHECKING:
     from cogs.music_remaster import MusicCog
@@ -276,7 +277,7 @@ class PlayerContainer(ui.Container):
                             )
             # Try to add the song to the user's favorites
             try:
-                await self.add_favorite(interaction.user.id, self.data["webpage_url"], self.data.get("title", "Unknown"))
+                await self.add_favorite(interaction.user.id)
             # If the song already exists
             except aiosqlite.IntegrityError:
                 print(f"[BOT] --- User {interaction.user.id} already has {self.data["webpage_url"]} in favorites.")
@@ -294,10 +295,10 @@ class PlayerContainer(ui.Container):
                             )
             await interaction.response.send_message(embed=favorite_embed, ephemeral=True, delete_after=30)
 
-        async def add_favorite(self, user_id, url, title):
+        async def add_favorite(self, user_id):
             # Connect to db and store the favorite
             async with aiosqlite.connect(self.music_cog.db_path) as db:
-                await db.execute("INSERT INTO user_favorites (user_id, url, title) VALUES (?, ?, ?)", (str(user_id), url, title))
+                await db.execute("INSERT INTO user_favorites (user_id, data) VALUES (?, ?)", (str(user_id), json.dumps(self.data)))
                 await db.commit()
 
         # Command to update the view when the user calls "/play volume", or lower and up volume

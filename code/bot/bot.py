@@ -13,10 +13,9 @@ async def init_db():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_favorites (
                 user_id TEXT NOT NULL,
-                url TEXT NOT NULL,
-                title TEXT,
+                data TEXT NOT NULL,
                 added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, url)
+                PRIMARY KEY (user_id, data)
             )
         """)
         await db.commit()

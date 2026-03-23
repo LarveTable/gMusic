@@ -363,7 +363,72 @@ class MusicCog(commands.Cog):
         # The view used to display the list
         list_view = ListLayout(self.waitlist, self.previous_list[len(self.previous_list)-1])
         await interaction.response.send_message(view=list_view, ephemeral=True, delete_after=30)
-    
+
+    # Sub-command to play the favorites list
+    @play_group.command(name='favorites', description='⭐ Play your favorites list.')
+    async def play_favorites(self, interaction: discord.Interaction):
+        # Defer the interaction to prevent timeouts
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        try:
+            # Get the favorites list for the user
+            favorites = await self.get_favorites(interaction.user.id)
+            if len(favorites) == 0:
+                no_favorites_embed = discord.Embed(
+                                    title=f'❌ Your favorites list is empty.',
+                                    description='Add some songs to your favorites list to be able to use this command.',
+                                    color=discord.Color.red()
+                                )
+                await interaction.edit_original_response(embed=no_favorites_embed)
+                return
+        except Exception as e:
+            error_embed = discord.Embed(
+                    title=f'❌ Unexpected error happened while retrieving favorites.',
+                    description='Check console for more details.',
+                    color=discord.Color.red()
+            )
+            print(f"[BOT] --- Error retrieving favorites: {e}")
+            await interaction.edit_original_response(embed=error_embed)
+            return
+
+        if not self.current_voice_channel_id or not self.current_guild_id or not self.current_text_channel_id:
+            # Ensure the bot is in the user's voice channel, or connect it (can't use before_invoke with app_commands)
+            try:
+                await self.ensure_voice(interaction)
+            except commands.CommandError:
+                return
+
+        # Get the voice client
+        voice_client = interaction.guild.voice_client
+
+        async with self.play_lock:
+            # Add each favorite to the waitlist
+            for data in favorites:
+                self.waitlist.append(data)
+            # Check if the bot is already playing or something will play and store the check
+            not_active_check = not voice_client.is_playing() and not voice_client.is_paused() and len(self.waitlist) == len(favorites)
+
+        if not_active_check:
+            playing_favorites_embed = discord.Embed(
+                                    title=f'✅ Playing your favorites!',
+                                    color=discord.Color.green()
+                                )
+            await interaction.edit_original_response(embed=playing_favorites_embed)
+            await self.play_next()
+        else:
+            adding_embed = discord.Embed(
+                                    title=f'⏳ Added your favorites list to the waiting list!',
+                                    color=discord.Color.green()
+                                )
+            await interaction.edit_original_response(embed=adding_embed)
+            global_adding_embed = discord.Embed(
+                                    title=f'⏳ -{interaction.user.name}- added their favorites list to the waiting list!',
+                                    color=discord.Color.green()
+                                )
+            await interaction.channel.send(embed=global_adding_embed)
+            # Push the player down
+            await self.ensure_player()
+
     # Sub-command to display the user's favorites
     @favorites_group.command(name='list', description='⭐ Display your favorites list.')
     async def favorites_list(self, interaction: discord.Interaction):
@@ -386,9 +451,9 @@ class MusicCog(commands.Cog):
     # Get the favorites list for a user from the db
     async def get_favorites(self, user_id):
         async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("SELECT url, title FROM user_favorites WHERE user_id = ?", (str(user_id),))
+            cursor = await db.execute("SELECT data FROM user_favorites WHERE user_id = ?", (str(user_id),))
             rows = await cursor.fetchall()
-            return [(row[0], row[1]) for row in rows]
+            return [json.loads(row[0]) for row in rows]
 
     # Clean up the bot's variables
     async def cleanup(self):
