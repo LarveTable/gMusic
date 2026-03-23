@@ -10,6 +10,7 @@ from views.player_view import PlayerContainer, PlayerLayout
 import json
 from views.waiting_list_view import ListLayout
 from views.favorites_view import FavoritesLayout
+import random as rand
 
 class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -366,7 +367,9 @@ class MusicCog(commands.Cog):
 
     # Sub-command to play the favorites list
     @play_group.command(name='favorites', description='⭐ Play your favorites list.')
-    async def play_favorites(self, interaction: discord.Interaction):
+    @app_commands.describe(random="Random order ?")
+    @app_commands.choices(random=[app_commands.Choice(name="Yes", value="True"), app_commands.Choice(name="No", value="False")])
+    async def play_favorites(self, interaction: discord.Interaction, random: app_commands.Choice[str]):
         # Defer the interaction to prevent timeouts
         await interaction.response.defer(ephemeral=True, thinking=True)
 
@@ -402,6 +405,8 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
 
         async with self.play_lock:
+            if random.value == "True":
+                rand.shuffle(favorites)
             # Add each favorite to the waitlist
             for data in favorites:
                 self.waitlist.append(data)
