@@ -447,6 +447,57 @@ class MusicCog(commands.Cog):
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
             return
         await interaction.response.send_message(view=favorites_view, ephemeral=True, delete_after=60)
+
+    # Preview the favorites to remove
+    async def favorites_remove_preview(self, interaction: discord.Interaction, query: str):
+        if query == "":
+            return []
+        # Get the favorites list for the user
+        try:
+            favorites = await self.get_favorites(interaction.user.id)
+        except Exception as e:
+            print(f"[BOT] --- Error retrieving favorites for autocomplete: {e}")
+            return []
+        lower_query = query.lower()
+        # Filter the favorites based on the query (in title or url)
+        filtered_favorites = [fav for fav in favorites if lower_query in fav['title'].lower() or lower_query in fav['webpage_url'].lower()]
+        # If no favorites match the query
+        if len(filtered_favorites) == 0:
+            return []
+        return [discord.app_commands.Choice(name=fav['title'], value=fav['id']) for fav in filtered_favorites][0:5]
+
+    # Sub-command to remove a song from the user's favorites
+    @favorites_group.command(name='remove', description='⭐ Remove a song from your favorites list.')
+    @app_commands.describe(song="Choose from the list, or provide url or title.")
+    @app_commands.autocomplete(song=favorites_remove_preview)
+    async def favorites_remove(self, interaction: discord.Interaction, song: str):
+        # Defer the interaction to prevent timeouts
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        # Try to delete the favorite from the db
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.execute("DELETE FROM user_favorites WHERE user_id = ? AND id = ?", (str(interaction.user.id), song))
+                await db.commit()
+            if cursor.rowcount == 0:
+                removed_embed = discord.Embed(
+                        title=f'❌ The song was not found in your favorites list.',
+                        color=discord.Color.orange()
+                )
+            else:
+                removed_embed = discord.Embed(
+                        title=f'✅ Successfully removed the song from your favorites list.',
+                        color=discord.Color.green()
+                )
+            await interaction.edit_original_response(embed=removed_embed)
+        except Exception as e:
+            error_embed = discord.Embed(
+                    title=f'❌ Unexpected error happened while removing the favorite.',
+                    description='Check console for more details.',
+                    color=discord.Color.red()
+            )
+            print(f"[BOT] --- Error removing favorite: {e}")
+            await interaction.edit_original_response(embed=error_embed)
+
     
     # Get the favorites list for a user from the db
     async def get_favorites(self, user_id):

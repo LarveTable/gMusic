@@ -280,7 +280,7 @@ class PlayerContainer(ui.Container):
                 await self.add_favorite(interaction.user.id)
             # If the song already exists
             except aiosqlite.IntegrityError:
-                print(f"[BOT] --- User {interaction.user.id} already has {self.data["webpage_url"]} in favorites.")
+                print(f"[BOT] --- User {interaction.user.id} already has {self.data['id']} in favorites.")
                 favorite_embed = discord.Embed(
                                 title=f'❌ The song is already in your favorites list.',
                                 color=discord.Color.orange()
@@ -298,7 +298,7 @@ class PlayerContainer(ui.Container):
         async def add_favorite(self, user_id):
             # Connect to db and store the favorite
             async with aiosqlite.connect(self.music_cog.db_path) as db:
-                await db.execute("INSERT INTO user_favorites (user_id, data) VALUES (?, ?)", (str(user_id), json.dumps(self.data)))
+                await db.execute("INSERT INTO user_favorites (user_id, id, data) VALUES (?, ?, ?)", (str(user_id), self.data['id'], json.dumps(self.data)))
                 await db.commit()
 
         # Command to update the view when the user calls "/play volume", or lower and up volume
