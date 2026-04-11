@@ -3,7 +3,9 @@
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from ctypes.util import find_library
 import os
+import sys
 import aiosqlite
 
 DB_PATH = "code/bot/music.db"
@@ -38,13 +40,38 @@ if not discord.opus.is_loaded():
     try:
         # Load Opus for voice support
 
-        # If you are on Windows, load the opus.dll in the cogs folder
-        if os.name == 'nt':
-            discord.opus.load_opus('code/bot/cogs/opus.dll')
+        opus_candidates = []
 
-        # This is the path for MacOS using homebrew
-        if os.name == 'posix':
-            discord.opus.load_opus('/opt/homebrew/lib/libopus.dylib')
+        # If you are on Windows, load the opus.dll in the cogs folder
+        if sys.platform.startswith('win'):
+            opus_candidates.append('code/bot/cogs/opus.dll')
+
+        # macOS Homebrew path
+        elif sys.platform == 'darwin':
+            opus_candidates.append('/opt/homebrew/lib/libopus.dylib')
+            opus_candidates.append('/usr/local/lib/libopus.dylib')
+
+        # Linux container and native Linux installs
+        elif sys.platform.startswith('linux'):
+            opus_candidates.extend([
+                'libopus.so.0',
+                '/usr/lib/x86_64-linux-gnu/libopus.so.0',
+                '/usr/lib/aarch64-linux-gnu/libopus.so.0',
+                '/usr/lib/libopus.so.0',
+            ])
+
+        found_opus = find_library('opus')
+        if found_opus:
+            opus_candidates.insert(0, found_opus)
+
+        for opus_path in opus_candidates:
+            try:
+                discord.opus.load_opus(opus_path)
+                break
+            except OSError:
+                continue
+        else:
+            raise RuntimeError('Opus library could not be found on this system.')
     except Exception:
         raise RuntimeError('Opus failed to load')
 
